@@ -1,0 +1,205 @@
+{
+ "n_tasks": 5,
+ "strategies": {
+  "solo": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 1.0,
+   "tokens_per_task": 364.2
+  },
+  "first": {
+   "passed": 4,
+   "n": 5,
+   "pass_rate": 0.8,
+   "ci95": [
+    0.3755282641185388,
+    0.9637768390302125
+   ],
+   "calls_per_task": 2.0,
+   "tokens_per_task": 1111.2
+  },
+  "vote": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 5.0,
+   "tokens_per_task": 2844.8
+  },
+  "debate": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 8.0,
+   "tokens_per_task": 7058.0
+  },
+  "tests_only": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 5.0,
+   "tokens_per_task": 2844.8
+  },
+  "arbitration_select": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 5.6,
+   "tokens_per_task": 3083.2
+  },
+  "arbitration": {
+   "passed": 5,
+   "n": 5,
+   "pass_rate": 1.0,
+   "ci95": [
+    0.5655085052479191,
+    1.0
+   ],
+   "calls_per_task": 6.0,
+   "tokens_per_task": 3464.6
+  }
+ },
+ "oracle_passed": 5,
+ "paired": {
+  "solo": {
+   "arbitration_wins": 0,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  },
+  "first": {
+   "arbitration_wins": 1,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  },
+  "vote": {
+   "arbitration_wins": 0,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  },
+  "debate": {
+   "arbitration_wins": 0,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  },
+  "tests_only": {
+   "arbitration_wins": 0,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  },
+  "arbitration_select": {
+   "arbitration_wins": 0,
+   "baseline_wins": 0,
+   "p_value": 1.0
+  }
+ },
+ "models": [
+  {
+   "provider": "ollama",
+   "model": "qwen2.5-coder:3b",
+   "roles": [
+    "coding",
+    "coordinator",
+    "research",
+    "testing"
+   ],
+   "calls": 55,
+   "errors": 0,
+   "input_tokens": 26189,
+   "output_tokens": 15883,
+   "avg_latency_s": 8.920267208345665,
+   "cost_usd": 0.0
+  }
+ ],
+ "evidence": {
+  "tasks_with_disagreement": 1,
+  "tasks_with_disputes": 3,
+  "disputed_cases": 9,
+  "rulings_decided": 9,
+  "rulings_unsure": 0,
+  "rulings_agreeing_with_reference": 7,
+  "rulings_checked": 9,
+  "tester_expectations_correct": 21,
+  "tester_expectations_judged": 26,
+  "spec_example_cases": 12,
+  "repairs_attempted": 2,
+  "repairs_accepted": 1,
+  "unsafe_candidates": 0
+ },
+ "per_task": [
+  {
+   "task_id": "HumanEval/10",
+   "solo": true,
+   "first": false,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/18",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/24",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/25",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/35",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  }
+ ]
+}

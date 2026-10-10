@@ -1,0 +1,25 @@
+# Initial-stage pilot: the whole pipeline on a free local model (no API key needed).
+# Requires Ollama running locally with: ollama pull qwen2.5-coder:3b
+
+[run]
+name = "pilot-local-qwen2.5-coder-3b"
+benchmark = "humaneval"
+n_tasks = 30          # seeded random sample of HumanEval's 164 problems
+sample_seed = 0
+seed = 0
+candidates = 3        # size of the shared candidate pool (K)
+debate_rounds = 1
+repair = true
+workers = 1           # Ollama serves one request at a time on a laptop
+
+[agents]              # research, coding, testing, security, documentation, ethics
+provider = "ollama"
+model = "qwen2.5-coder:3b"
+temperature = 0.7
+max_tokens = 1024
+
+[coordinator]         # arbiter for disputes and judge for debate
+provider = "ollama"
+model = "qwen2.5-coder:3b"
+temperature = 0.2
+max_tokens = 1024
