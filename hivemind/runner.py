@@ -40,7 +40,8 @@ def _llm(section: dict):
 
 def build_coordinator(config: dict, ledger: Ledger) -> Coordinator:
     run = config["run"]
-    team = Team(_llm(config["agents"]), _llm(config["coordinator"]), ledger)
+    role_llms = {role: _llm(section) for role, section in config.get("roles", {}).items()}
+    team = Team(_llm(config["agents"]), _llm(config["coordinator"]), ledger, role_llms=role_llms)
     return Coordinator(team, n_candidates=run.get("candidates", 3),
                        debate_rounds=run.get("debate_rounds", 1), repair=run.get("repair", True),
                        seed=run.get("seed", 0))

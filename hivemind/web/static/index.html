@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HiveMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="mark" aria-hidden="true"></span>HiveMind</div>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#run" data-tab="run">Run</a>
+    <a href="#agents" data-tab="agents">Agents</a>
+    <a href="#experiments" data-tab="experiments">Experiments</a>
+    <a href="#results" data-tab="results">Results</a>
+  </nav>
+  <div class="health" id="health" aria-live="polite"></div>
+</header>
+<p class="offline" id="offline" hidden>Can't reach the HiveMind server. Check that <code>python -m hivemind serve</code> is still running, then reload.</p>
+
+<main>
+  <!-- Run: one problem, live -->
+  <section class="tab" id="tab-run" hidden>
+    <div class="run-layout">
+      <aside class="side">
+        <form class="panel" id="run-form" autocomplete="off">
+          <h2>Run one problem</h2>
+          <div class="field">
+            <label for="run-task">Problem</label>
+            <input id="run-task" list="task-list" placeholder="Number or function name" spellcheck="false">
+            <datalist id="task-list"></datalist>
+            <p class="hint" id="run-task-summary"></p>
+          </div>
+          <div class="field">
+            <label for="run-config">Config</label>
+            <select id="run-config"></select>
+            <p class="hint" id="run-config-models"></p>
+          </div>
+          <label class="check"><input type="checkbox" id="run-review"> Add the Security, Documentation and Ethics reviews</label>
+          <ul class="fixes" id="run-problems" hidden></ul>
+          <div class="actions">
+            <button type="submit" class="primary" id="run-start">Run</button>
+            <button type="button" id="run-cancel" hidden>Cancel</button>
+          </div>
+          <p class="hint" id="run-state" aria-live="polite"></p>
+        </form>
+        <ol class="pipeline" id="pipeline" aria-label="Pipeline progress"></ol>
+      </aside>
+      <div class="feed" id="feed">
+        <div class="empty">
+          <h3>Watch the team work</h3>
+          <p>Pick a problem and press Run. Each agent's message appears here as soon as it is written, followed by the sandbox evidence, the Coordinator's rulings and how every strategy did.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Agents: configs -->
+  <section class="tab" id="tab-agents" hidden>
+    <div class="two-col">
+      <aside class="panel side-list">
+        <h2>Configs</h2>
+        <ul class="list" id="config-list"></ul>
+        <p class="hint">Each config is a file in <code>configs/</code>. Open one to edit it, or change the file name to save a copy.</p>
+      </aside>
+      <form class="panel config-form" id="config-form" novalidate autocomplete="off">
+        <div class="grid-2">
+          <div class="field">
+            <label for="cf-file">File name</label>
+            <input id="cf-file" data-path="file" spellcheck="false" required>
+            <p class="hint">Saved as configs/<span id="cf-file-echo">name</span>.toml</p>
+          </div>
+          <div class="field">
+            <label for="cf-run-name">Results folder</label>
+            <input id="cf-run-name" data-path="run.name" spellcheck="false" required>
+            <p class="hint">Experiments write to runs/<span id="cf-run-echo">name</span></p>
+          </div>
+        </div>
+        <fieldset id="cf-agents"><legend>Agent team</legend><p class="hint">Used by every agent role unless the role has its own model below.</p></fieldset>
+        <fieldset id="cf-coordinator"><legend>Coordinator</legend><p class="hint">Rules on disputed cases and judges the debate baseline.</p></fieldset>
+        <fieldset id="cf-roles"><legend>Model per role</legend></fieldset>
+        <fieldset id="cf-pipeline">
+          <legend>Pipeline</legend>
+          <div class="grid-3">
+            <div class="field"><label for="cf-candidates">Candidates per problem</label><input id="cf-candidates" type="number" min="1" max="8" data-path="run.candidates"></div>
+            <div class="field"><label for="cf-debate">Debate rounds</label><input id="cf-debate" type="number" min="0" max="5" data-path="run.debate_rounds"></div>
+            <div class="field"><label for="cf-n-tasks">Problems per experiment</label><input id="cf-n-tasks" type="number" min="1" max="164" data-path="run.n_tasks"></div>
+            <div class="field"><label for="cf-sample-seed">Problem sample seed</label><input id="cf-sample-seed" type="number" min="0" data-path="run.sample_seed"></div>
+            <div class="field"><label for="cf-seed">Model seed</label><input id="cf-seed" type="number" min="0" data-path="run.seed"></div>
+            <div class="field"><label for="cf-workers">Problems in parallel</label><input id="cf-workers" type="number" min="1" max="16" data-path="run.workers"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="cf-repair" data-path="run.repair"> Repair round after arbitration</label>
+        </fieldset>
+        <ul class="fixes" id="cf-problems" hidden></ul>
+        <div class="actions">
+          <button type="submit" class="primary" id="cf-save">Save</button>
+          <span class="hint" id="cf-saved" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Experiments -->
+  <section class="tab" id="tab-experiments" hidden>
+    <div class="two-col">
+      <form class="panel" id="exp-form" autocomplete="off">
+        <h2>Launch an experiment</h2>
+        <div class="field">
+          <label for="exp-config">Config</label>
+          <select id="exp-config"></select>
+        </div>
+        <div class="field">
+          <label for="exp-n">Number of problems</label>
+          <input id="exp-n" type="number" min="1" max="164">
+          <p class="hint">A seeded sample of HumanEval's 164 problems. Use 164 for all of them.</p>
+        </div>
+        <p class="hint" id="exp-where"></p>
+        <ul class="fixes" id="exp-problems" hidden></ul>
+        <div class="actions"><button type="submit" class="primary" id="exp-start">Launch</button></div>
+      </form>
+      <div class="panel" id="exp-progress">
+        <div class="empty small">
+          <h3>No experiment running</h3>
+          <p>Launch one to follow its progress here. It runs as a separate process, so you can reload this page or close it and come back.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section class="tab" id="tab-results" hidden>
+    <div class="two-col">
+      <aside class="panel side-list">
+        <h2>Experiments</h2>
+        <ul class="list" id="run-list"></ul>
+        <h2>Live runs</h2>
+        <ul class="list" id="demo-list"></ul>
+      </aside>
+      <div id="result-view">
+        <div class="empty">
+          <h3>Pick a run</h3>
+          <p>Experiments show their pass rates, cost and evidence numbers, and every problem's conversation can be replayed. Live runs replay the conversation you watched.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
