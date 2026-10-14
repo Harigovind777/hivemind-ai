@@ -7,7 +7,7 @@ name = "hivemind"
 version = "0.1.0"
 description = "HiveMind AI: specialist LLM agents that resolve disagreements with checkable evidence"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"  # tomllib
 dependencies = ["anthropic>=1.0"]
 
 [project.optional-dependencies]
@@ -15,6 +15,9 @@ dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 include = ["hivemind*"]
+
+[tool.setuptools.package-data]
+hivemind = ["web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

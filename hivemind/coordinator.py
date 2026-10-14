@@ -115,8 +115,11 @@ class Coordinator:
 
     # ------------------------------------------------------------------ pipeline
 
-    def solve(self, task: CodeTask, review: bool = False) -> tuple[TaskOutcome, Transcript]:
-        tr = Transcript(task.task_id)
+    def solve(self, task: CodeTask, review: bool = False, on_event=None,
+              cancel=None) -> tuple[TaskOutcome, Transcript]:
+        """Solve one task. `on_event` receives live progress events (see Transcript.emit);
+        setting the `cancel` Event stops the run before its next model call."""
+        tr = Transcript(task.task_id, on_event=on_event, cancel=cancel)
         seed = (self.seed * 7919 + zlib.crc32(task.task_id.encode())) % 2**31
         ask = self._asker(tr)
 
@@ -135,6 +138,10 @@ class Coordinator:
         unsafe = [bool(static_scan(c)) for c in candidates]
 
         sigs = [tuple(r.signature for r in res) for res in results]
+        tr.emit("evidence", candidates=self.k, cases=len(cases),
+                spec_cases=sum(c.source == "spec" for c in cases),
+                tester_cases=sum(c.source == "tester" for c in cases),
+                distinct_behaviours=len(set(sigs)), unsafe_candidates=sum(unsafe))
         runnable = [not res or any(r.is_answer for r in res) for res in results]
         # Programs that never produce a result cannot form a voting bloc.
         cluster = [sum(s == t and ok for t, ok in zip(sigs, runnable)) if runnable[i] else 0
@@ -145,6 +152,7 @@ class Coordinator:
         tests_pick = min(range(self.k), key=lambda i: (unsafe[i], -stated[i], -cluster[i], i))
 
         verified, rulings, disputes = self._arbitrate(task, cases, results, ask, seed)
+        tr.emit("rulings", disputes=disputes, rulings=[asdict(r) for _, r, _ in rulings])
 
         def score(res: list[CaseResult]) -> int:
             return sum(_satisfies(rule, res[j]) for j, rule in verified.items())

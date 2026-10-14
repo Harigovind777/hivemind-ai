@@ -8,7 +8,9 @@ ethics run in review mode (`hivemind demo`).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import threading
+from dataclasses import InitVar, dataclass, field
+from typing import Callable
 
 from .llm import LLM, CallRecord, Ledger
 
@@ -55,15 +57,35 @@ ROLE_PROMPTS = {
 }
 
 
+class Cancelled(Exception):
+    """The run was cancelled; raised before the next model call."""
+
+
 @dataclass
 class Transcript:
     """Every message exchanged while solving one task, for inspection and replay."""
 
     task_id: str
     turns: list[dict] = field(default_factory=list)
+    # Not fields, so asdict() and saved transcripts are unchanged.
+    on_event: InitVar[Callable[[dict], None] | None] = None
+    cancel: InitVar[threading.Event | None] = None
+
+    def __post_init__(self, on_event, cancel) -> None:
+        self._on_event = on_event
+        self._cancel = cancel
 
     def add(self, **turn) -> None:
         self.turns.append(turn)
+
+    def emit(self, type: str, **data) -> None:
+        """Tell a live listener (the web UI) what just happened; a no-op for CLI runs."""
+        if self._on_event is not None:
+            self._on_event({"type": type, "task_id": self.task_id, **data})
+
+    def check_cancelled(self) -> None:
+        if self._cancel is not None and self._cancel.is_set():
+            raise Cancelled(self.task_id)
 
 
 class Agent:
@@ -79,15 +101,22 @@ class Agent:
         return ROLE_PROMPTS[self.role]
 
     def ask(self, prompt: str, *, transcript: Transcript, phase: str, seed: int = 0) -> str:
+        transcript.check_cancelled()
         record = dict(task_id=transcript.task_id, phase=phase, role=self.role,
                       provider=self.llm.provider, model=self.llm.model)
+        transcript.emit("turn_started", phase=phase, role=self.role,
+                        provider=self.llm.provider, model=self.llm.model)
         try:
             result = self.llm.complete(self.system, prompt, seed=seed)
         except Exception as exc:  # a failed call is recorded and treated as an empty answer
+            error = f"{type(exc).__name__}: {exc}"
             self.ledger.add(CallRecord(**record, input_tokens=0, output_tokens=0,
-                                       latency_s=0.0, error=f"{type(exc).__name__}: {exc}"))
+                                       latency_s=0.0, error=error))
             transcript.add(phase=phase, role=self.role, prompt=prompt, response="",
                            error=str(exc))
+            transcript.emit("turn", phase=phase, role=self.role, provider=self.llm.provider,
+                            model=self.llm.model, prompt=prompt, response="", input_tokens=0,
+                            output_tokens=0, latency_s=0.0, error=error)
             return ""
         # Record the model that actually served the call (it differs after a fallback).
         self.ledger.add(CallRecord(**{**record, "model": result.model},
@@ -95,15 +124,25 @@ class Agent:
                                    output_tokens=result.output_tokens,
                                    latency_s=result.latency_s))
         transcript.add(phase=phase, role=self.role, prompt=prompt, response=result.text)
+        transcript.emit("turn", phase=phase, role=self.role, provider=self.llm.provider,
+                        model=result.model, prompt=prompt, response=result.text,
+                        input_tokens=result.input_tokens, output_tokens=result.output_tokens,
+                        latency_s=result.latency_s, error=None)
         return result.text
 
 
 class Team:
-    """One agent per role. Agents and coordinator may use different models."""
+    """One agent per role. Agents and coordinator may use different models, and
+    `role_llms` can give any agent role a model of its own."""
 
-    def __init__(self, agent_llm: LLM, coordinator_llm: LLM, ledger: Ledger):
+    def __init__(self, agent_llm: LLM, coordinator_llm: LLM, ledger: Ledger,
+                 role_llms: dict[str, LLM] | None = None):
+        role_llms = role_llms or {}
+        unknown = set(role_llms) - set(ROLE_PROMPTS) | ({"coordinator"} & set(role_llms))
+        if unknown:
+            raise ValueError(f"cannot override roles {sorted(unknown)}")
         self.ledger = ledger
-        self.agents = {role: Agent(role, agent_llm, ledger)
+        self.agents = {role: Agent(role, role_llms.get(role, agent_llm), ledger)
                        for role in ROLE_PROMPTS if role != "coordinator"}
         self.agents["coordinator"] = Agent("coordinator", coordinator_llm, ledger)
 

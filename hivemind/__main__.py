@@ -29,12 +29,19 @@ def main() -> None:
     p_demo.add_argument("config")
     p_demo.add_argument("--task", default="HumanEval/0")
 
+    p_serve = sub.add_parser("serve", help="open the web interface on this computer")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument("--no-open", action="store_true", help="don't open a browser tab")
+
     args = parser.parse_args()
     if args.command == "run":
         out = run_experiment(args.config, n_tasks=args.tasks, out_dir=args.out)
         print(f"[hivemind] report: {out / 'report.md'}")
     elif args.command == "report":
         print(write_report(args.run_dir))
+    elif args.command == "serve":
+        from .web import server
+        server.serve(port=args.port, open_browser=not args.no_open)
     else:
         demo(args.config, args.task)
 
