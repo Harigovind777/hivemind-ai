@@ -48,7 +48,7 @@ Thread entries:
 | Team round | Agent bubbles colour-coded by role (brief, candidates, tests, sandbox evidence, rulings, repair) streaming in live, folded into "Show how the team got there" once the round ends |
 | Answer card | Final code, its source (candidate n or repair), "Passes 7 of 7 verified cases: 3 from your examples, 4 ruled on by the Coordinator", the rulings |
 | Coordinator answer | Reply to a question, headed "Read as a question · treat as a change instead" |
-| Error | Red bubble with the reason and Retry |
+| Error | Red entry with the reason, then a Retry button |
 
 Status strip: a running team round shows as "Chat round running".
 
@@ -61,8 +61,9 @@ Changes to the existing core (backward compatible):
   solo baseline, then that method, then debate and grading, so its calls, their
   order, seeds, transcript and outcome are unchanged. New `answer(task,
   on_event=None, cancel=None) -> (ChatAnswer, Transcript)` runs only the middle.
-  `ChatAnswer`: `code`, `source`, `candidates`, `unsafe`, `verified_total`,
-  `verified_passed`, `spec_cases`, `ruled_cases`, `rulings`,
+  `ChatAnswer`: `code`, `source`, `candidates`, `unsafe`, `working`,
+  `verified_total`, `verified_passed`, `spec_cases`, `ruled_cases`,
+  `undisputed_cases`, `failures` (call, expected, got), `rulings`,
   `distinct_behaviours`, `repaired`. No grading and no reference diagnostics.
 - `web/live.py`: the event history (append with `seq`, `events_after`,
   `wait_events`) moves into a small `EventLog` class; `LiveRun` uses it with no
@@ -115,18 +116,24 @@ models), `candidates`, `repair` and `seed`. `debate_rounds`, `n_tasks`,
 | `POST /api/chats/<id>/messages` `{text}` | Draft a spec, or classify then answer/draft |
 | `POST /api/chats/<id>/go` `{spec}` | Validate the spec and start a team round |
 | `POST /api/chats/<id>/reinterpret` `{message}` | Redo a classified message with the other reading |
+| `POST /api/chats/<id>/retry` | Run the last action again after it failed, was cancelled or was interrupted |
 | `POST /api/chats/<id>/cancel` | Stop at the next model-call boundary |
 
-New event types: `message` (your text), `classified`, `spec`, `answer`,
+New event types: `message` (your text), `action` (the team starts on
+something), `classified`, `spec`, `spec_superseded`, `round_started`, `answer`,
 `question_answer`, plus the existing `turn_started`, `turn`, `evidence`,
-`rulings`, `error`, `done`.
+`rulings`, `error`, and `done` (which now names its action). The page loads a
+chat's whole thread with `GET /api/chats/<id>`, then follows new events with
+`?after=`.
 
 `runs/chats/` is added to `.gitignore`, like `runs/demos/`.
 
 ## Errors
 
 - Ollama down, model not pulled, or Claude without a key: the readiness check
-  runs before each action; the chat shows the fix in a red bubble with Retry.
+  runs before each action. The fix appears above the message box (or under the
+  spec card for Go) and your text is kept, so pressing Send or Go again retries.
+  A failed or interrupted action in the thread gets a Retry button.
 - Go while another job runs: HTTP 409; the chat says the round waits for the
   experiment or live run to finish or be cancelled.
 - A second action in the same chat while one runs: HTTP 409; the composer is
