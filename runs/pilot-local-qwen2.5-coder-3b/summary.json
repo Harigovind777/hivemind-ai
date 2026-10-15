@@ -1,113 +1,113 @@
 {
- "n_tasks": 5,
+ "n_tasks": 30,
  "strategies": {
   "solo": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 25,
+   "n": 30,
+   "pass_rate": 0.8333333333333334,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.6643529481431982,
+    0.9266356575964831
    ],
    "calls_per_task": 1.0,
-   "tokens_per_task": 364.2
+   "tokens_per_task": 442.93333333333334
   },
   "first": {
-   "passed": 4,
-   "n": 5,
-   "pass_rate": 0.8,
+   "passed": 20,
+   "n": 30,
+   "pass_rate": 0.6666666666666666,
    "ci95": [
-    0.3755282641185388,
-    0.9637768390302125
+    0.48779725813830266,
+    0.807697044731538
    ],
    "calls_per_task": 2.0,
-   "tokens_per_task": 1111.2
+   "tokens_per_task": 1172.9666666666667
   },
   "vote": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 24,
+   "n": 30,
+   "pass_rate": 0.8,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.6269395261897256,
+    0.9049502189759876
    ],
    "calls_per_task": 5.0,
-   "tokens_per_task": 2844.8
+   "tokens_per_task": 3102.9333333333334
   },
   "debate": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 24,
+   "n": 30,
+   "pass_rate": 0.8,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.6269395261897256,
+    0.9049502189759876
    ],
    "calls_per_task": 8.0,
-   "tokens_per_task": 7058.0
+   "tokens_per_task": 7676.1
   },
   "tests_only": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 27,
+   "n": 30,
+   "pass_rate": 0.9,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.7437855868473339,
+    0.9654007400402839
    ],
    "calls_per_task": 5.0,
-   "tokens_per_task": 2844.8
+   "tokens_per_task": 3102.9333333333334
   },
   "arbitration_select": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 24,
+   "n": 30,
+   "pass_rate": 0.8,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.6269395261897256,
+    0.9049502189759876
    ],
-   "calls_per_task": 5.6,
-   "tokens_per_task": 3083.2
+   "calls_per_task": 5.8,
+   "tokens_per_task": 3538.866666666667
   },
   "arbitration": {
-   "passed": 5,
-   "n": 5,
-   "pass_rate": 1.0,
+   "passed": 25,
+   "n": 30,
+   "pass_rate": 0.8333333333333334,
    "ci95": [
-    0.5655085052479191,
-    1.0
+    0.6643529481431982,
+    0.9266356575964831
    ],
-   "calls_per_task": 6.0,
-   "tokens_per_task": 3464.6
+   "calls_per_task": 6.366666666666666,
+   "tokens_per_task": 4087.6666666666665
   }
  },
- "oracle_passed": 5,
+ "oracle_passed": 27,
  "paired": {
   "solo": {
-   "arbitration_wins": 0,
-   "baseline_wins": 0,
+   "arbitration_wins": 3,
+   "baseline_wins": 3,
    "p_value": 1.0
   },
   "first": {
-   "arbitration_wins": 1,
-   "baseline_wins": 0,
-   "p_value": 1.0
+   "arbitration_wins": 7,
+   "baseline_wins": 2,
+   "p_value": 0.1796875
   },
   "vote": {
-   "arbitration_wins": 0,
-   "baseline_wins": 0,
+   "arbitration_wins": 3,
+   "baseline_wins": 2,
    "p_value": 1.0
   },
   "debate": {
-   "arbitration_wins": 0,
-   "baseline_wins": 0,
+   "arbitration_wins": 2,
+   "baseline_wins": 1,
    "p_value": 1.0
   },
   "tests_only": {
    "arbitration_wins": 0,
-   "baseline_wins": 0,
-   "p_value": 1.0
+   "baseline_wins": 2,
+   "p_value": 0.5
   },
   "arbitration_select": {
-   "arbitration_wins": 0,
+   "arbitration_wins": 1,
    "baseline_wins": 0,
    "p_value": 1.0
   }
@@ -122,27 +122,27 @@
     "research",
     "testing"
    ],
-   "calls": 55,
+   "calls": 341,
    "errors": 0,
-   "input_tokens": 26189,
-   "output_tokens": 15883,
-   "avg_latency_s": 8.920267208345665,
+   "input_tokens": 187055,
+   "output_tokens": 98798,
+   "avg_latency_s": 12.274010580513234,
    "cost_usd": 0.0
   }
  ],
  "evidence": {
-  "tasks_with_disagreement": 1,
-  "tasks_with_disputes": 3,
-  "disputed_cases": 9,
-  "rulings_decided": 9,
-  "rulings_unsure": 0,
-  "rulings_agreeing_with_reference": 7,
-  "rulings_checked": 9,
-  "tester_expectations_correct": 21,
-  "tester_expectations_judged": 26,
-  "spec_example_cases": 12,
-  "repairs_attempted": 2,
-  "repairs_accepted": 1,
+  "tasks_with_disagreement": 15,
+  "tasks_with_disputes": 24,
+  "disputed_cases": 81,
+  "rulings_decided": 76,
+  "rulings_unsure": 5,
+  "rulings_agreeing_with_reference": 36,
+  "rulings_checked": 76,
+  "tester_expectations_correct": 171,
+  "tester_expectations_judged": 217,
+  "spec_example_cases": 23,
+  "repairs_attempted": 17,
+  "repairs_accepted": 2,
   "unsafe_candidates": 0
  },
  "per_task": [
@@ -192,6 +192,281 @@
   },
   {
    "task_id": "HumanEval/35",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/37",
+   "solo": true,
+   "first": false,
+   "vote": false,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/52",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/55",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": false,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/64",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/66",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/72",
+   "solo": true,
+   "first": false,
+   "vote": true,
+   "debate": false,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/77",
+   "solo": false,
+   "first": false,
+   "vote": false,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/79",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/80",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/84",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/90",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/91",
+   "solo": false,
+   "first": false,
+   "vote": false,
+   "debate": false,
+   "tests_only": false,
+   "arbitration_select": false,
+   "arbitration": false,
+   "oracle": false
+  },
+  {
+   "task_id": "HumanEval/98",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/103",
+   "solo": true,
+   "first": false,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/107",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/111",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/120",
+   "solo": true,
+   "first": false,
+   "vote": false,
+   "debate": false,
+   "tests_only": false,
+   "arbitration_select": false,
+   "arbitration": false,
+   "oracle": false
+  },
+  {
+   "task_id": "HumanEval/122",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": false,
+   "arbitration": false,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/124",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/129",
+   "solo": false,
+   "first": false,
+   "vote": false,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": false,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/130",
+   "solo": false,
+   "first": false,
+   "vote": false,
+   "debate": false,
+   "tests_only": false,
+   "arbitration_select": false,
+   "arbitration": false,
+   "oracle": false
+  },
+  {
+   "task_id": "HumanEval/136",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/142",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": false,
+   "tests_only": true,
+   "arbitration_select": false,
+   "arbitration": false,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/149",
+   "solo": false,
+   "first": false,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/150",
    "solo": true,
    "first": true,
    "vote": true,
