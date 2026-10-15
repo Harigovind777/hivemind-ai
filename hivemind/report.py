@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import math
-import tomllib
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -41,6 +40,24 @@ def mcnemar_exact(b: int, c: int) -> float:
     return min(1.0, 2 * tail)
 
 
+def holm_bonferroni(p_values: list[float]) -> list[float]:
+    """Holm–Bonferroni step-down adjusted p-values, in the order given.
+
+    A family of six comparisons against the same baseline is exactly the case where an
+    uncorrected p-value misleads: one p of 0.05 in six tests is close to expected by chance.
+    """
+    m = len(p_values)
+    if m == 0:
+        return []
+    order = sorted(range(m), key=lambda i: p_values[i])
+    adjusted = [0.0] * m
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, p_values[i] * (m - rank))
+        adjusted[i] = min(1.0, running)
+    return adjusted
+
+
 def cost_usd(provider: str, model: str, tokens_in: int, tokens_out: int) -> float | None:
     if provider != "anthropic":
         return 0.0
@@ -63,6 +80,7 @@ def summarise(run_dir: Path) -> dict:
     for c in calls:
         per_task_calls[c["task_id"]].append(c)
 
+    k = max((len(o.get("candidates", [])) for o in outcomes), default=0)
     strategies = {}
     for name in STRATEGIES:
         passed = sum(o["answers"][name]["passed"] for o in outcomes)
@@ -83,7 +101,10 @@ def summarise(run_dir: Path) -> dict:
             continue
         b = sum(o["answers"]["arbitration"]["passed"] and not o["answers"][name]["passed"] for o in outcomes)
         c = sum(o["answers"][name]["passed"] and not o["answers"]["arbitration"]["passed"] for o in outcomes)
-        paired[name] = {"arbitration_wins": b, "baseline_wins": c, "p_value": mcnemar_exact(b, c)}
+        paired[name] = {"arbitration_wins": b, "baseline_wins": c,
+                        "p_value": mcnemar_exact(b, c), "p_holm": 0.0}
+    for name, p_holm in zip(paired, holm_bonferroni([r["p_value"] for r in paired.values()])):
+        paired[name]["p_holm"] = p_holm
 
     models = defaultdict(lambda: {"roles": set(), "calls": 0, "errors": 0, "input_tokens": 0,
                                   "output_tokens": 0, "latency_s": 0.0})
@@ -109,12 +130,20 @@ def summarise(run_dir: Path) -> dict:
     rulings = [r for d in diag for r in d["rulings"]]
     decided = [r for r in rulings if r["choice"] is not None]
     checked = [r for r in decided if r["reference_agrees"] is not None]
+    unreadable = [r for r in rulings if r.get("parse_failed")]
+    reasons = [x for d in diag for x in d.get("candidate_failures", [])]
+    reason_counts = dict(sorted(((x, reasons.count(x)) for x in set(reasons)),
+                                key=lambda kv: -kv[1]))
     evidence = {
         "tasks_with_disagreement": sum(not d["unanimous"] for d in diag),
         "tasks_with_disputes": sum(d["n_disputes"] > 0 for d in diag),
         "disputed_cases": sum(d["n_disputes"] for d in diag),
         "rulings_decided": len(decided),
-        "rulings_unsure": len(rulings) - len(decided),
+        # Genuine "the spec does not determine this" answers...
+        "rulings_unsure": len(rulings) - len(decided) - len(unreadable),
+        # ...kept apart from replies we failed to parse. Conflating the two would make a
+        # formatting bug look like the arbiter declining to decide.
+        "rulings_unreadable": len(unreadable),
         "rulings_agreeing_with_reference": sum(r["reference_agrees"] for r in checked),
         "rulings_checked": len(checked),
         "tester_expectations_correct": sum(d["tester_correct"] for d in diag),
@@ -123,6 +152,17 @@ def summarise(run_dir: Path) -> dict:
         "repairs_attempted": sum(d["failing_after_selection"] > 0 for d in diag),
         "repairs_accepted": sum(d["repaired"] for d in diag),
         "unsafe_candidates": sum(d["unsafe_candidates"] for d in diag),
+        "unsafe_answers": sum(len(d.get("unsafe_answers", [])) for d in diag),
+        "solo_unsafe": sum(d.get("solo_unsafe", False) for d in diag),
+        "debate_unsafe": sum(d.get("debate_unsafe", False) for d in diag),
+        "grade_reasons": reason_counts,
+        # Precondition for H1/H2: how much diversity the candidate pool actually had.
+        "distinct_behaviours": {v: sum(1 for d in diag if d["distinct_behaviours"] == v)
+                                for v in sorted({d["distinct_behaviours"] for d in diag})},
+        "pool_diversity": (sum(d["distinct_behaviours"] for d in diag) / (len(diag) * k)
+                           if diag and k else 0.0),
+        "verified_cases": sum(d.get("verified_cases", 0) for d in diag),
+        "cases_total": sum(d.get("cases_total", 0) for d in diag),
     }
     return {"n_tasks": n, "strategies": strategies, "oracle_passed": oracle, "paired": paired,
             "models": model_rows, "evidence": evidence,
@@ -135,9 +175,13 @@ def _pct(x: float) -> str:
     return f"{100 * x:.1f}%"
 
 
-def write_report(run_dir: str | Path) -> Path:
+def write_report(run_dir: str | Path, excluded: int = 0) -> Path:
     run_dir = Path(run_dir)
     s = summarise(run_dir)
+    # Imported here rather than at module scope: only report generation reads a config
+    # file, and callers such as the web interface use the price table without ever
+    # touching TOML.
+    import tomllib
     with open(run_dir / "config.toml", "rb") as f:
         config = tomllib.load(f)
     run, agents, coord = config["run"], config["agents"], config["coordinator"]
@@ -149,6 +193,15 @@ def write_report(run_dir: str | Path) -> Path:
              f"Benchmark: **HumanEval**, {n} tasks "
              f"(seeded random sample, sample_seed={run.get('sample_seed', 0)}). "
              f"Graded by the benchmark's hidden unit tests, which no agent ever sees.", ""]
+
+    if excluded:
+        # Stated first and in bold: an all-zero table caused by a dead provider is
+        # otherwise indistinguishable from a genuine negative result.
+        lines = [f"> **⚠ Run incomplete: {excluded} task(s) produced no usable output and are "
+                 f"EXCLUDED from every number below.** The pass rates are computed on the "
+                 f"{n} tasks that did complete, not on all {n + excluded}. Check credentials, "
+                 f"model name and rate limits, then re-run to retry the excluded tasks.",
+                 ""] + lines
 
     lines += ["## Models used", "",
               "| Provider | Model | Roles | Calls | Failed calls | Input tokens | Output tokens | Avg latency | Cost (USD) |",
@@ -194,28 +247,52 @@ def write_report(run_dir: str | Path) -> Path:
               "for any strategy that only *selects* a candidate; repair and debate can exceed it.", ""]
 
     lines += ["## Arbitration vs. each baseline (paired, same tasks)", "",
-              "| Baseline | Arbitration right, baseline wrong | Baseline right, arbitration wrong | Exact McNemar p |",
-              "|---|---:|---:|---:|"]
+              "| Baseline | Arbitration right, baseline wrong | Baseline right, arbitration wrong | Exact McNemar p | Holm-corrected p |",
+              "|---|---:|---:|---:|---:|"]
     for name, p in s["paired"].items():
-        lines.append(f"| `{name}` | {p['arbitration_wins']} | {p['baseline_wins']} | {p['p_value']:.3f} |")
+        lines.append(f"| `{name}` | {p['arbitration_wins']} | {p['baseline_wins']} | "
+                     f"{p['p_value']:.3f} | {p['p_holm']:.3f} |")
+    lines += ["", f"The Holm column corrects for the {len(s['paired'])} comparisons in this table. "
+              "Read that one: at these sample sizes an uncorrected p-value of 0.05 across six "
+              "baselines is roughly what you expect by chance.", ""]
 
     e = s["evidence"]
 
     def frac(a, b):
         return f"{a}/{b} ({_pct(a / b)})" if b else "0/0"
 
+    div = ", ".join(f"{c} task{'s' if c != 1 else ''} with {v} distinct behaviour"
+                    f"{'s' if v != '1' else ''}"
+                    for v, c in sorted(e["distinct_behaviours"].items()))
     lines += ["", "## Evidence diagnostics", "",
+              "### Did the disagreement the method needs actually happen?", "",
               f"- Tasks where candidates behaved differently: {e['tasks_with_disagreement']}/{n}",
               f"- Tasks needing a ruling: {e['tasks_with_disputes']}/{n}; disputed cases: {e['disputed_cases']}",
-              f"- Coordinator rulings: {e['rulings_decided']} decided, {e['rulings_unsure']} unsure",
+              f"- Distinct behaviours among the {k} candidates: {div}",
+              f"- Pool diversity: {_pct(e['pool_diversity'])} of the maximum {k}. **A low value "
+              "here means arbitration had little to arbitrate**, so a flat result reflects a "
+              "saturated candidate pool rather than a method that does not work.",
+              f"- Cases verified out of cases gathered: {e['verified_cases']}/{e['cases_total']}", "",
+              "### Arbitration behaviour", "",
+              f"- Coordinator rulings: {e['rulings_decided']} decided, {e['rulings_unsure']} unsure "
+              f"(the spec did not determine the answer)",
+              f"- Replies we could not parse: {e['rulings_unreadable']}"
+              + ("  ← **non-zero means the arbiter's output format is breaking the measurement**"
+                 if e["rulings_unreadable"] else ""),
               f"- Rulings that agree with the benchmark's reference solution (analysis only): "
               f"{frac(e['rulings_agreeing_with_reference'], e['rulings_checked'])}",
               f"- Testing agent's expected values that were actually correct: "
               f"{frac(e['tester_expectations_correct'], e['tester_expectations_judged'])}",
               f"- Docstring example cases used as trusted evidence: {e['spec_example_cases']}",
               f"- Repairs attempted: {e['repairs_attempted']}; accepted (verified score improved): "
-              f"{e['repairs_accepted']}",
-              f"- Candidates flagged by the static security check: {e['unsafe_candidates']}", ""]
+              f"{e['repairs_accepted']}", "",
+              "### Failure and security audit", ""]
+    if e["grade_reasons"]:
+        lines.append("- Why candidates failed the hidden tests (a `timeout` is not a wrong answer):")
+        lines += [f"  - `{reason}`: {count}" for reason, count in e["grade_reasons"].items()]
+    lines += [f"- Candidates flagged by the static security check: {e['unsafe_candidates']}",
+              f"- Final answers flagged, by strategy: {e['unsafe_answers']} in total "
+              f"(solo: {e['solo_unsafe']} tasks, debate: {e['debate_unsafe']} tasks)", ""]
 
     names = list(STRATEGIES)
     lines += ["## Per-task results", "",
@@ -226,6 +303,19 @@ def write_report(run_dir: str | Path) -> Path:
         lines.append(f"| {row['task_id']} | {marks} |")
 
     lines += ["", "## How to read this", ""]
+    if s["evidence"]["pool_diversity"] < 0.34:
+        lines.append(f"- **Candidate diversity was low** (mean {_pct(s['evidence']['pool_diversity'])} "
+                     f"of the maximum). Check this before believing any comparison above: with "
+                     "candidates that mostly agree, vote and arbitration are being asked the same "
+                     "easy question and cannot separate.")
+    if s["evidence"]["rulings_unreadable"]:
+        lines.append(f"- {s['evidence']['rulings_unreadable']} arbiter replies could not be parsed and "
+                     "their cases went unverified. That is a harness limitation, not a model "
+                     "failure, and it shrinks the evidence base for every arbitration strategy.")
+    if any(x in s["evidence"]["grade_reasons"] for x in ("timeout", "syntax", "load")):
+        lines.append("- Some candidates failed for mechanical reasons (timeout, syntax, import). "
+                     "Those are counted as failures in the table above but are not the method "
+                     "choosing the wrong solution.")
     if n < 100:
         lines.append(f"- This is a **pilot** with {n} tasks: the confidence intervals are wide and a "
                      "p-value above 0.05 means the run cannot distinguish the strategies yet. Its job "

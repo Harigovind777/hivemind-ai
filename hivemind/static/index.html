@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HiveMind AI</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1d212a; --line: #2a2f3a;
+    --text: #e6e8ee; --muted: #98a0b3; --accent: #6ea8fe; --good: #4ade80;
+    --bad: #f87171; --warn: #fbbf24; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f7f9; --panel:#fff; --panel-2:#f0f2f6; --line:#dde1e8;
+            --text:#12151b; --muted:#5b6472; --accent:#1a5fd0; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:22px 26px 14px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:20px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); margin-top:5px; font-size:13.5px; max-width:74ch; }
+  main { max-width:1180px; margin:0 auto; padding:22px 26px 64px; }
+  .notice { border:1px solid #7c5c12; background:#3a2c08; color:#f7d478;
+            padding:11px 14px; border-radius:8px; font-size:13px; margin:16px 0; }
+  @media (prefers-color-scheme: light) { .notice { background:#fff8e6; color:#6b4e06; border-color:#e8d59a; } }
+  form { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  textarea { width:100%; min-height:190px; padding:12px; border-radius:8px; resize:vertical;
+             border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+             font:13.5px/1.5 var(--mono); }
+  textarea:focus, input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; align-items:flex-end; }
+  label { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted); }
+  input, select { padding:8px 10px; border-radius:7px; border:1px solid var(--line);
+                  background:var(--panel-2); color:var(--text); font-size:13.5px; min-width:130px; }
+  .checks { display:flex; gap:18px; align-items:center; margin-top:14px; font-size:13px;
+            color:var(--muted); flex-wrap:wrap; }
+  .checks label { flex-direction:row; align-items:center; gap:7px; }
+  input[type=checkbox] { min-width:auto; width:15px; height:15px; accent-color:var(--accent); }
+  button { margin-top:14px; padding:10px 20px; border-radius:8px; border:0; cursor:pointer;
+           background:var(--accent); color:#fff; font-size:14px; font-weight:600; }
+  button:disabled { opacity:.55; cursor:not-allowed; }
+  .err { color:var(--bad); font-size:13px; margin-top:10px; white-space:pre-wrap; }
+  .live { margin-top:22px; }
+  .turn { border-left:3px solid var(--line); padding:9px 0 9px 13px; margin-bottom:10px; }
+  .turn .meta { font-size:11.5px; color:var(--muted); text-transform:uppercase;
+                letter-spacing:.06em; margin-bottom:5px; }
+  .turn .meta b { color:var(--accent); font-weight:600; }
+  .turn pre { margin:0; white-space:pre-wrap; word-break:break-word;
+              font:12.5px/1.5 var(--mono); color:var(--text); }
+  .turn.thinking .meta b { color:var(--warn); }
+  h2 { font-size:16px; margin:32px 0 12px; letter-spacing:-.01em; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px;
+          display:flex; flex-direction:column; }
+  .card.win { border-color:var(--good); box-shadow:0 0 0 1px var(--good) inset; }
+  .card h3 { margin:0 0 3px; font-size:14.5px; display:flex; justify-content:space-between;
+             align-items:center; gap:8px; }
+  .card .src { font-size:11.5px; color:var(--muted); font-family:var(--mono); }
+  .pill { font-size:11px; padding:2px 8px; border-radius:99px; font-weight:700; letter-spacing:.03em;
+          white-space:nowrap; }
+  .pill.ok { background:#14532d; color:#86efac; }
+  .pill.bad { background:#4a1d1d; color:#fca5a5; }
+  .pill.mid { background:#422006; color:#fcd34d; }
+  @media (prefers-color-scheme: light) {
+    .pill.ok { background:#dcfce7; color:#14532d; } .pill.bad { background:#fee2e2; color:#991b1b; }
+    .pill.mid { background:#fef3c7; color:#92400e; }
+  }
+  .card .blurb { font-size:12px; color:var(--muted); margin:7px 0 10px; }
+  .card pre { margin:0; background:var(--panel-2); border:1px solid var(--line); border-radius:7px;
+              padding:10px; overflow-x:auto; font:12px/1.5 var(--mono); max-height:230px; }
+  .why { font-size:12px; color:var(--muted); margin-top:8px; }
+  .why .bad { color:var(--bad); } .why .warn { color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase;
+       letter-spacing:.05em; }
+  td.num { font-family:var(--mono); white-space:nowrap; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .facts { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px;
+           margin-bottom:6px; }
+  .fact { background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .fact .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .fact .v { font-size:18px; margin-top:3px; font-family:var(--mono); }
+  details { margin-top:10px; } summary { cursor:pointer; font-size:13px; color:var(--accent); }
+  .foot { margin-top:34px; padding-top:16px; border-top:1px solid var(--line);
+          font-size:12px; color:var(--muted); }
+  .foot a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>HiveMind AI</h1>
+  <div class="sub">
+    Give one prompt to a team of specialist agents &mdash; Research, Coding, Testing, Security,
+    Documentation and Ethics &mdash; run by a Coordinator that settles disagreements with
+    execution evidence instead of votes. All seven resolution strategies are applied to the
+    <em>same</em> candidate pool, so you can watch which way the disagreement was settled.
+  </div>
+</header>
+
+<main>
+  <div class="notice">
+    <strong>These results are not benchmark scores.</strong> A prompt typed here has no hidden
+    test suite. Every number below is the team's <em>own verified evidence</em> &mdash; cases the
+    agents wrote and the Coordinator checked against the specification. Benchmark pass rates
+    come from <code>python -m hivemind run</code>.
+  </div>
+
+  <form id="f">
+    <label for="prompt">Prompt &mdash; a function signature and what it should do</label>
+    <textarea id="prompt" name="prompt" spellcheck="false"
+placeholder='def second_smallest(numbers):
+    """Return the second smallest distinct value in numbers.
+
+    >>> second_smallest([4, 1, 3, 3, 2])
+    2
+    >>> second_smallest([9, 9, 8])
+    8
+    """'></textarea>
+    <div class="row">
+      <label>Entry point (blank = detect)
+        <input id="entry_point" name="entry_point" placeholder="auto">
+      </label>
+      <label>Candidates (K)
+        <input id="candidates" name="candidates" type="number" min="1" max="7" value="3">
+      </label>
+      <label>Debate rounds
+        <input id="debate_rounds" name="debate_rounds" type="number" min="0" max="3" value="1">
+      </label>
+      <label>Provider
+        <select id="provider" name="provider"></select>
+      </label>
+      <label>Agent model
+        <input id="model" name="model" placeholder="from config">
+      </label>
+      <label>Coordinator model
+        <input id="coordinator_model" name="coordinator_model" placeholder="same as agents">
+      </label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="repair" name="repair" checked> Repair round</label>
+      <label><input type="checkbox" id="strict_sandbox" name="strict_sandbox">
+             Strict sandbox (no network or filesystem)</label>
+      <label><input type="checkbox" id="review" checked> Run Security / Docs / Ethics review</label>
+      <span id="cfg-note"></span>
+    </div>
+    <button type="submit" id="go">Run the team</button>
+    <div class="err" id="err"></div>
+  </form>
+
+  <div class="live" id="live"></div>
+  <div id="out"></div>
+
+  <div class="foot">
+    <p style="margin:0 0 6px">
+      Streaming transcript above; results below.
+      <a href="/api/docs">API docs</a>.
+    </p>
+    <p style="margin:0">
+      A local Ollama model makes each run free but slow. With Claude configured, each solve is
+      roughly 10&ndash;12 calls.
+    </p>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const live = $("live"), out = $("out"), errBox = $("err");
+
+fetch("/api/config").then(r => r.json()).then(cfg => {
+  const sel = $("provider");
+  const a = cfg.agents || {}, c2 = cfg.coordinator || a;
+  (cfg.providers || ["ollama"]).forEach(p => {
+    const o = document.createElement("option");
+    o.value = p; o.textContent = p;
+    if (p === (a.provider || "")) o.selected = true;
+    sel.appendChild(o);
+  });
+  if (cfg.candidates) $("candidates").value = cfg.candidates;
+  if (cfg.debate_rounds != null) $("debate_rounds").value = cfg.debate_rounds;
+  $("repair").checked = cfg.repair !== false;
+  $("strict_sandbox").checked = !!cfg.strict_sandbox;
+  $("model").placeholder = a.model || "from config";
+  $("coordinator_model").placeholder = c2.model || "same as agents";
+  $("cfg-note").textContent = a.provider
+    ? `server default: ${a.provider} / ${a.model}`
+    : "no config passed: set a provider and model above";
+}).catch(() => {});
+
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errBox.textContent = "";
+  out.innerHTML = "";
+  // The stream is still consumed so the run can be cancelled and errors surfaced, but the
+  // per-agent chatter is not rendered. Only the winning answer is wanted, so the transcript
+  // would be noise between the click and the result.
+  live.innerHTML = '<h2>Progress</h2><div id="turns"><div class="turn thinking" id="prog"><div class="meta"><b>team</b> · working</div><pre>running the agents…</pre></div></div>';
+  $("go").disabled = true;
+  $("go").textContent = "Running…";
+
+  const body = new FormData($("f"));
+  body.set("repair", $("repair").checked);
+  body.set("strict_sandbox", $("strict_sandbox").checked);
+
+  let jobId;
+  try {
+    const r = await fetch("/api/solve", { method: "POST", body });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+    jobId = data.job_id;
+  } catch (ex) {
+    errBox.textContent = String(ex.message || ex);
+    $("go").disabled = false; $("go").textContent = "Run the team";
+    return;
+  }
+
+  const turns = document.getElementById("turns");
+  const es = new EventSource(`/api/events/${jobId}`);
+  let streamError = null;
+  let steps = 0;
+
+  es.onmessage = (ev) => {
+    const e = JSON.parse(ev.data);
+    if (e.kind === "phase") {
+      // Activity is counted instead of rendered. The stream must still be consumed so
+      // "close" fires and errors surface, but the per-agent chatter is dropped: only the
+      // winning answer is wanted, so the transcript is noise between click and result.
+      steps += 1;
+      const prog = document.getElementById("prog");
+      if (prog) prog.querySelector("pre").textContent = `working… (${steps} steps)`;
+    } else if (e.kind === "error") {
+      streamError = e.message;
+      const div = document.createElement("div");
+      div.className = "turn";
+      div.innerHTML = `<div class="meta"><b>error</b> · ${esc(e.kind)}</div><pre>${esc(e.message)}</pre>`;
+      turns.appendChild(div);
+    } else if (e.kind === "close") {
+      es.close();
+      if (e.error) streamError = e.error;
+      finish();
+    }
+  };
+  es.onerror = () => { es.close(); finish(); };
+
+  async function finish() {
+    $("go").disabled = false; $("go").textContent = "Run the team";
+    if (streamError) {
+      errBox.textContent = streamError;
+      return;
+    }
+    const r = await fetch(`/api/result/${jobId}`);
+    const res = await r.json();
+    if (res.status === "error") { errBox.textContent = res.error; return; }
+    if (res.status !== "ok") { errBox.textContent = "The run ended without a result."; return; }
+    render(res);
+  }
+});
+
+// `evidence_only` lives on the result, not on each answer, so it is passed in. Reading it
+// off the answer made every card fall through to "passed"/"failed", which is exactly the
+// accuracy claim a browser prompt cannot support.
+function pill(a, evidenceOnly) {
+  if (evidenceOnly) {
+    const e = a.evidence || {};
+    if (e.error) return `<span class="pill bad">${esc(e.error)}</span>`;
+    if (!e.verified_total) {
+      return `<span class="pill mid">no verified cases</span>`;
+    }
+    const full = e.verified_satisfied === e.verified_total;
+    const none = e.verified_satisfied === 0;
+    const cls = full ? "ok" : (none ? "bad" : "mid");
+    const lab = full ? "all verified"
+                     : `${e.verified_satisfied}/${e.verified_total} verified`;
+    return `<span class="pill ${cls}">${lab}</span>`;
+  }
+  return `<span class="pill ${a.passed ? "ok" : "bad"}">${a.passed ? "passed" : "failed"}</span>`;
+}
+
+// Picks the one answer to show. Ranking is evidence-first: only an answer that satisfied
+// every verified case is called perfect, and among those the Coordinator's own choice
+// (arbitration) is preferred. Failing that, the closest partial result is shown and labelled
+// as failing, because presenting a failure as a solution is the one thing this page must
+// never do.
+function bestAnswer(r) {
+  const entries = r.strategy_order
+    .map(name => [name, r.answers[name]])
+    .filter(([, a]) => a && a.code && a.code.trim());
+  if (!entries.length) return null;
+
+  const perfect = entries.filter(([, a]) => a.passed);
+  const pool = perfect.length ? perfect : entries;
+  const pref = ["arbitration", "arbitration_select", "debate", "vote", "tests_only", "first", "solo"];
+  const rank = ([, a]) => (r.evidence_only
+    ? (a.evidence?.verified_satisfied ?? 0)
+    : (a.evidence?.verified_satisfied ?? 0));
+  const order = ([n]) => pref.indexOf(n) === -1 ? pref.length : pref.indexOf(n);
+
+  return pool.slice().sort((x, y) => rank(y) - rank(x) || order(x) - order(y))[0];
+}
+
+function bestCard(r) {
+  const hit = bestAnswer(r);
+  if (!hit) return `<div class="card"><pre>(no code produced by any strategy)</pre></div>`;
+  const [name, a] = hit;
+  const syn = a.syntax_error ? `<div class="why"><span class="bad">syntax: ${esc(a.syntax_error)}</span></div>` : "";
+  const sec = a.security_findings && a.security_findings.length
+    ? `<div class="why"><span class="warn">security: ${esc(a.security_findings.join("; "))}</span></div>` : "";
+  const ev = a.evidence || {};
+  const detail = r.evidence_only && ev.verified_total != null
+    ? `${ev.verified_satisfied} of ${ev.verified_total} verified cases, ` +
+      `${ev.stated_passed ?? 0} of ${ev.stated_total ?? 0} stated by the Testing agent`
+    : (a.grade_reason || "");
+  return `<div class="card win">
+    <h3><code>${esc(name)}</code>${pill(a, r.evidence_only)}</h3>
+    <div class="src">${esc(a.source)}</div>
+    <pre>${esc(a.code)}</pre>
+    <div class="why">${esc(detail)}</div>${syn}${sec}
+  </div>`;
+}
+
+function render(r) {
+  const winners = Object.entries(r.answers)
+    .filter(([, a]) => a.passed).map(([n]) => n);
+  const d = r.diagnostics;
+  const k = d.max_distinct_behaviours || r.candidates.length || 1;
+  const diversityPct = d.distinct_behaviours === 1 ? 0
+    : Math.round((d.distinct_behaviours / k) * 100);
+
+  out.innerHTML = `
+    <h2>Result</h2>
+    <div class="facts">
+      <div class="fact"><div class="k">Entry point</div><div class="v">${esc(r.entry_point)}</div></div>
+      <div class="fact"><div class="k">Candidates</div><div class="v">${r.candidates.length}</div></div>
+      <div class="fact"><div class="k">Distinct behaviours</div>
+        <div class="v">${d.distinct_behaviours} of ${d.max_distinct_behaviours ?? r.candidates.length}</div></div>
+      <div class="fact"><div class="k">Disputed cases</div><div class="v">${d.n_disputes}</div></div>
+      <div class="fact"><div class="k">Verified cases</div>
+        <div class="v">${d.verified_cases}/${d.cases_total}</div></div>
+      <div class="fact"><div class="k">Model calls</div><div class="v">${r.calls.length}</div></div>
+      <div class="fact"><div class="k">Cost</div>
+        <div class="v">${r.cost_usd ? "$" + r.cost_usd.toFixed(4) : "free"}</div></div>
+      <div class="fact"><div class="k">Elapsed</div><div class="v">${r.elapsed_s}s</div></div>
+    </div>
+    ${winners.length
+      ? `<p style="font-size:13.5px">Satisfied every verified case:
+         <strong>${winners.map(w => `<code>${esc(w)}</code>`).join(", ")}</strong>.</p>`
+      : `<p style="font-size:13.5px">No strategy satisfied every verified case. That is a
+         result about this team's evidence, not a proof the prompt is unsolvable.</p>`}
+
+    <div class="panel" style="margin-top:14px">
+      <strong style="font-size:13.5px">Best answer</strong>
+      <div style="margin-top:12px">${bestCard(r)}</div>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:13px;color:#888">
+          Show all ${r.strategy_order.length} strategies instead
+        </summary>
+        <div class="grid" style="margin-top:12px">
+          ${r.strategy_order.map(name => {
+            const a = r.answers[name];
+            if (!a) return "";
+            const isWin = a.passed;
+            const syn = a.syntax_error ? `<div class="why"><span class="bad">syntax: ${esc(a.syntax_error)}</span></div>` : "";
+            const sec = a.security_findings && a.security_findings.length
+              ? `<div class="why"><span class="warn">security: ${esc(a.security_findings.join("; "))}</span></div>` : "";
+            return `<div class="card ${isWin ? "win" : ""}">
+              <h3><code>${esc(name)}</code>${pill(a, r.evidence_only)}</h3>
+              <div class="src">${esc(a.source)}</div>
+              <div class="blurb">${esc(a.blurb)}</div>
+              <pre>${esc(a.code || "(no code produced)")}</pre>
+              <div class="why">${esc(a.grade_reason || "")}</div>${syn}${sec}
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    </div>
+
+    <h2>Why the Coordinator decided as it did</h2>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Case</th><th>Options seen</th><th>Ruling</th><th>Read?</th></tr></thead>
+        <tbody>
+          ${d.rulings.length ? d.rulings.map(r => `<tr>
+            <td class="num">${esc(r.call)}</td>
+            <td class="num">${esc((r.options || []).join("  |  "))}</td>
+            <td class="num">${r.choice != null ? esc(r.choice) : (r.parse_failed
+                ? '<span class="bad">reply unreadable</span>' : "UNSURE")}</td>
+            <td>${r.parse_failed ? '<span class="bad">no</span>' : "yes"}</td>
+          </tr>`).join("") : `<tr><td colspan="4">No case was disputed, so the Coordinator was
+             never asked to rule. With identical candidates every strategy sees the same
+             question.</td></tr>`}
+        </tbody>
+      </table>
+      ${d.rulings_unreadable ? `<p class="why"><span class="bad">${d.rulings_unreadable}
+        ruling(s) could not be parsed and left those cases unverified. That is a harness
+        limitation, not the arbiter declining to decide.</span></p>` : ""}
+      <div class="facts" style="margin-top:14px">
+        <div class="fact"><div class="k">Spec examples</div><div class="v">${d.n_spec_cases}</div></div>
+        <div class="fact"><div class="k">Agent-written tests</div><div class="v">${d.n_tester_cases}</div></div>
+        <div class="fact"><div class="k">Repair</div>
+          <div class="v">${d.repaired ? "kept" : (d.failing_after_selection ? "tried, rejected" : "not needed")}</div></div>
+        <div class="fact"><div class="k">Pool diversity</div>
+          <div class="v">${diversityPct}%</div></div>
+      </div>
+      ${d.distinct_behaviours === 1 ? `<p class="why"><span class="warn">Every candidate behaved
+        identically, so there was nothing to arbitrate. Vote and arbitration were asked the same
+        easy question on this run; a tie between them here is not evidence about the method.</span></p>` : ""}
+    </div>
+
+    ${r.review ? `<h2>Review agents</h2>
+      <div class="panel">
+        ${["security", "documentation", "ethics"].map(k => `
+          <details ${k === "security" ? "open" : ""}>
+            <summary>${esc(k)}</summary>
+            <pre style="white-space:pre-wrap;word-break:break-word">${esc((r.review[k] || "").trim() || "(no response)")}</pre>
+          </details>`).join("")}
+        ${(r.review.static_security_findings || []).length
+          ? `<p class="why"><span class="warn">Static scan on the final answer:
+             ${esc(r.review.static_security_findings.join("; "))}</span></p>` : ""}
+      </div>` : ""}
+  `;
+  out.scrollIntoView({ block: "start" });
+}
+</script>
+</body>
+</html>

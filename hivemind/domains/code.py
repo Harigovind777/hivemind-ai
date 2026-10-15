@@ -61,13 +61,38 @@ def reference_program(task: CodeTask) -> str:
     return task.prompt + task.canonical_solution
 
 
-def grade(task: CodeTask, code: str) -> bool:
+def grade(task: CodeTask, code: str, *, timeout_s: float = 15.0) -> bool:
     """Ground truth: does the candidate pass the benchmark's hidden tests?"""
+    return grade_detailed(task, code, timeout_s=timeout_s)[0]
+
+
+def grade_detailed(task: CodeTask, code: str, *, timeout_s: float = 15.0,
+                   strict: bool = False) -> tuple[bool, str]:
+    """Grade, and say why. A timeout is not a wrong answer and must be distinguishable.
+
+    Returns (passed, reason). Reasons worth counting separately in a report:
+      "empty", "timeout", "syntax", "load", "assertion", "exception", "ok".
+    """
     if not code.strip():
-        return False
+        return False, "empty"
     source = f"{build_program(task, code)}\n{task.hidden_test}\ncheck({task.entry_point})\n"
-    ok, _ = run_program(source)
-    return ok
+    try:
+        ast.parse(source)
+    except SyntaxError as exc:
+        return False, f"syntax: {exc.msg}"
+    ok, err = run_program(source, timeout_s=timeout_s, strict=strict)
+    if ok:
+        return True, "ok"
+    if "Timeout" in err:
+        return False, "timeout"
+    for marker, reason in (("AssertionError", "assertion"), ("NameError", "load"),
+                           ("ImportError", "load"), ("IndentationError", "load"),
+                           ("TypeError", "exception"), ("ValueError", "exception"),
+                           ("RecursionError", "exception"), ("ZeroDivisionError", "exception"),
+                           ("MemoryError", "exception")):
+        if marker in err:
+            return False, reason
+    return False, "load" if "Error" in err else "exception"
 
 
 # ---------------------------------------------------------------- parsing model output
@@ -93,6 +118,11 @@ def sanitize(code: str) -> str:
 
     Models often append their own asserts or demo calls after the function; a wrong
     self-test would otherwise crash an implementation that is itself correct.
+
+    Module-level *setup* is deliberately kept: a `try/except` import fallback, a
+    version-gated `if`, or a table built in a loop is part of a working solution, and
+    dropping it turns a correct candidate into a `NameError` that is then scored as
+    wrong. Only statements that merely *exercise* the solution are removed.
     """
     try:
         tree = ast.parse(code)
@@ -104,13 +134,54 @@ def sanitize(code: str) -> str:
         return any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in defined
                    for c in ast.walk(node))
 
-    kept = [n for n in tree.body
-            if isinstance(n, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef,
-                              ast.ClassDef))
-            or (isinstance(n, (ast.Assign, ast.AnnAssign)) and not calls_own_function(n))]
+    def is_main_guard(node: ast.AST) -> bool:
+        # `if __name__ == "__main__":` and the demo body it guards.
+        test = node.test if isinstance(node, ast.If) else None
+        return isinstance(test, ast.Compare) and any(
+            isinstance(c, ast.Name) and c.id == "__name__" for c in ast.walk(test))
+
+    def keep(node: ast.AST) -> bool:
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef)):
+            return True
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            return not calls_own_function(node)
+        if isinstance(node, ast.If):
+            return not is_main_guard(node)  # version-gated setup is real logic
+        if isinstance(node, (ast.Try, ast.For, ast.While, ast.With)):
+            # Keep it if it sets something up; drop it if it only runs the solution.
+            return not _is_self_test_body(node, defined)
+        return False
+
+    kept = [n for n in tree.body if keep(n)]
     if not kept:
         return code
     return ast.unparse(ast.Module(body=kept, type_ignores=[]))
+
+
+def _is_self_test_body(node: ast.AST, defined: set[str]) -> bool:
+    """True when a module-level control-flow statement exists only to exercise the solution."""
+    body = getattr(node, "body", None) or getattr(node, "finalbody", None) or []
+    if not body:
+        return False
+    for stmt in body:
+        # An assert, print or bare call to the solution = a self-test. An import or
+        # assignment is setup and must be kept.
+        if isinstance(stmt, (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign,
+                             ast.AugAssign, ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef, ast.Pass)):
+            continue
+        if isinstance(stmt, ast.Assert):
+            return True
+        if isinstance(stmt, ast.Expr):
+            # `TABLE.append(x)` is setup; `print(f(1))` and `f(1)` are self-tests.
+            return _calls_any(stmt, defined)
+    return False
+
+
+def _calls_any(node: ast.AST, names: set[str]) -> bool:
+    return any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in names
+               for c in ast.walk(node))
 
 
 def _is_target_call(node: ast.AST, entry_point: str) -> bool:
