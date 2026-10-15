@@ -17,6 +17,7 @@ from typing import Callable
 from ..agents import Cancelled
 from ..coordinator import Coordinator
 from ..domains.code import CodeTask
+from .events import EventLog
 
 
 class LiveRun:
@@ -30,8 +31,7 @@ class LiveRun:
         self.meta = meta or {}
         self.status = "running"
         self.started_at = time.time()
-        self._events: list[dict] = []
-        self._cond = threading.Condition()
+        self.log = EventLog()
         self._cancel = threading.Event()
         self.thread = threading.Thread(target=self._work, name=f"live-{run_id}", daemon=True)
 
@@ -51,26 +51,18 @@ class LiveRun:
     # ------------------------------------------------------------------ events
 
     def _emit(self, event: dict) -> None:
-        with self._cond:
-            self._events.append({"seq": len(self._events) + 1, "time": time.time(), **event})
-            self._cond.notify_all()
+        self.log.emit(event)
 
     def events_after(self, after: int) -> list[dict]:
-        with self._cond:
-            return list(self._events[max(0, after):])
+        return self.log.events_after(after)
 
     def wait_events(self, after: int, timeout: float) -> list[dict]:
         """Events with seq > `after`, waiting up to `timeout` seconds for the next one."""
-        with self._cond:
-            if len(self._events) <= after and not self.finished:
-                self._cond.wait(timeout)
-            return list(self._events[max(0, after):])
+        return self.log.wait_events(after, timeout)
 
     def summary(self) -> dict:
-        with self._cond:
-            last = self._events[-1]["seq"] if self._events else 0
         return {"kind": "live", "id": self.id, "task_id": self.task.task_id, "status": self.status,
-                "started_at": self.started_at, "last_seq": last, **self.meta}
+                "started_at": self.started_at, "last_seq": self.log.last_seq, **self.meta}
 
     # ------------------------------------------------------------------ work
 
@@ -96,3 +88,4 @@ class LiveRun:
             status = "failed"
         self.status = status
         self._emit({"type": "done", "status": status})
+        self.log.close()
