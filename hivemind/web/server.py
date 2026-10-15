@@ -18,16 +18,19 @@ import tomllib
 import traceback
 import uuid
 import webbrowser
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .. import config as cfg
+from ..chat import SpecError
 from ..domains.code import CodeTask, load_humaneval
 from ..llm import Ledger
 from ..report import summarise
 from ..runner import ROOT, build_coordinator
+from .chats import Chat, ChatBusy, ChatError, load_chats
 from .jobs import ExperimentJob
 from .live import LiveRun
 from .status import DEFAULT_OLLAMA, claude_credentials, ollama_status, problems
@@ -43,6 +46,19 @@ class ApiError(Exception):
         super().__init__(message)
         self.status = status
         self.payload = {"error": message, **extra}
+
+
+@contextmanager
+def _chat_errors():
+    """Chat refusals as HTTP answers: busy is 409; anything else the chat rejects is 400."""
+    try:
+        yield
+    except ChatBusy as exc:
+        raise ApiError(409, str(exc)) from None
+    except SpecError as exc:
+        raise ApiError(400, str(exc), line=exc.line) from None
+    except ChatError as exc:
+        raise ApiError(400, str(exc)) from None
 
 
 def _safe(name: str, what: str) -> str:
@@ -89,6 +105,9 @@ class App:
         self.lives: dict[str, LiveRun] = {}
         self.jobs: dict[str, ExperimentJob] = {}
         self._lock = threading.Lock()
+        self.chats_dir = self.runs_dir / "chats"
+        self._chats: dict[str, Chat] | None = None
+        self._chats_lock = threading.Lock()
 
     # ------------------------------------------------------------------ status
 
@@ -101,6 +120,9 @@ class App:
         for job in [*self.lives.values(), *self.jobs.values()]:
             if not job.finished:
                 return job.summary()
+        for chat in self._all_chats().values():
+            if chat.busy == "round":
+                return chat.summary()
         return None
 
     def status(self) -> dict:
@@ -156,7 +178,8 @@ class App:
     def _ensure_idle(self) -> None:
         current = self.current()
         if current is not None:
-            what = current.get("task_id") or current.get("config") or current["id"]
+            what = (current.get("task_id") or current.get("title") or current.get("config")
+                    or current["id"])
             raise ApiError(409, f"A {current['kind']} run ({what}) is still running; cancel it first",
                            current=current)
 
@@ -211,6 +234,84 @@ class App:
         if job is None:
             raise ApiError(404, f"No experiment {job_id!r}")
         return job
+
+    # ------------------------------------------------------------------ chats
+
+    def _all_chats(self) -> dict[str, Chat]:
+        with self._chats_lock:
+            if self._chats is None:
+                self._chats = {c.id: c for c in load_chats(self.chats_dir)}
+            return self._chats
+
+    def chat(self, chat_id: str) -> Chat:
+        chat = self._all_chats().get(_safe(chat_id, "chat"))
+        if chat is None:
+            raise ApiError(404, f"No chat {chat_id!r}")
+        return chat
+
+    def chat_list(self) -> list[dict]:
+        return sorted((c.summary() for c in self._all_chats().values()),
+                      key=lambda s: s["updated"], reverse=True)
+
+    def create_chat(self, body: dict) -> dict:
+        name = body.get("config")
+        if not isinstance(name, str):
+            raise ApiError(400, "Choose a config")
+        config = self.get_config(name)
+        if config["errors"]:
+            raise ApiError(400, f"Config {name!r} has errors; fix it on the Agents tab",
+                           errors=config["errors"])
+        chat = Chat.create(self.chats_dir, name)
+        self._all_chats()[chat.id] = chat
+        return {"id": chat.id}
+
+    def _chat_build(self, chat: Chat):
+        """Readiness first, so the chat can show what to fix; then a team for its config."""
+        _, config = self._runnable_config({"config": chat.config})
+        return lambda: self.build(config)
+
+    def chat_send(self, chat_id: str, body: dict) -> dict:
+        chat = self.chat(chat_id)
+        text = body.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ApiError(400, "Type a message first")
+        if len(text) > 4000:
+            raise ApiError(400, "Keep messages under 4,000 characters")
+        build = self._chat_build(chat)
+        with _chat_errors():
+            return {"message_id": chat.send(text.strip(), build)}
+
+    def chat_go(self, chat_id: str, body: dict) -> dict:
+        chat = self.chat(chat_id)
+        spec, spec_id = body.get("spec"), body.get("spec_id")
+        if not isinstance(spec, str) or not isinstance(spec_id, str):
+            raise ApiError(400, 'Send the spec as {"spec": "...", "spec_id": "s1"}')
+        build = self._chat_build(chat)
+        with self._lock, _chat_errors():
+            self._ensure_idle()
+            return {"round": chat.go(spec, spec_id, build)}
+
+    def chat_reinterpret(self, chat_id: str, body: dict) -> dict:
+        chat = self.chat(chat_id)
+        message_id = body.get("message_id")
+        if not isinstance(message_id, str):
+            raise ApiError(400, "Say which message to switch")
+        build = self._chat_build(chat)
+        with _chat_errors():
+            chat.reinterpret(message_id, build)
+        return {"reinterpreting": message_id}
+
+    def chat_retry(self, chat_id: str) -> dict:
+        chat = self.chat(chat_id)
+        action = chat.retryable()
+        if action is None:
+            raise ApiError(400, "There is nothing to retry")
+        build = self._chat_build(chat)
+        with self._lock, _chat_errors():
+            if action["action"] == "round":
+                self._ensure_idle()
+            chat.retry(build)
+        return {"retrying": True}
 
     # ------------------------------------------------------------------ results
 
@@ -284,6 +385,14 @@ def _routes(app: App):
         ("POST", r"/api/experiments", lambda b, q: (201, app.start_experiment(b))),
         ("GET", r"/api/experiments/([^/]+)", lambda i, b, q: app.job(i).progress()),
         ("POST", r"/api/experiments/([^/]+)/cancel", lambda i, b, q: (app.job(i).cancel(), {"cancelled": True})[1]),
+        ("GET", r"/api/chats", lambda b, q: app.chat_list()),
+        ("POST", r"/api/chats", lambda b, q: (201, app.create_chat(b))),
+        ("GET", r"/api/chats/([^/]+)", lambda i, b, q: app.chat(i).to_dict()),
+        ("POST", r"/api/chats/([^/]+)/messages", lambda i, b, q: (202, app.chat_send(i, b))),
+        ("POST", r"/api/chats/([^/]+)/go", lambda i, b, q: (202, app.chat_go(i, b))),
+        ("POST", r"/api/chats/([^/]+)/reinterpret", lambda i, b, q: (202, app.chat_reinterpret(i, b))),
+        ("POST", r"/api/chats/([^/]+)/retry", lambda i, b, q: (202, app.chat_retry(i))),
+        ("POST", r"/api/chats/([^/]+)/cancel", lambda i, b, q: (app.chat(i).cancel(), {"cancelling": True})[1]),
         ("GET", r"/api/runs", lambda b, q: app.runs()),
         ("GET", r"/api/runs/([^/]+)", lambda name, b, q: app.run_detail(name)),
         ("GET", r"/api/runs/([^/]+)/transcripts/([^/]+)", lambda name, t, b, q: app.transcript(name, t)),
@@ -293,7 +402,8 @@ def _routes(app: App):
 
 def make_server(app: App, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     routes = [(m, re.compile(p + "$"), h) for m, p, h in _routes(app)]
-    events_route = re.compile(r"/api/live/([^/]+)/events$")
+    events_routes = [(re.compile(r"/api/live/([^/]+)/events$"), app.live),
+                     (re.compile(r"/api/chats/([^/]+)/events$"), app.chat)]
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "HiveMind"
@@ -335,8 +445,8 @@ def make_server(app: App, host: str = "127.0.0.1", port: int = 8765) -> Threadin
                 return
             self._send(200, file.read_bytes(), CONTENT_TYPES.get(file.suffix, "application/octet-stream"))
 
-        def _events(self, run_id: str, query: dict) -> None:
-            run = app.live(run_id)
+        def _events(self, run, query: dict) -> None:
+            """Stream a live run's or a chat's events, from `?after=` or Last-Event-ID on."""
             try:
                 after = int((query.get("after") or [self.headers.get("Last-Event-ID") or 0])[0])
             except ValueError:
@@ -367,8 +477,10 @@ def make_server(app: App, host: str = "127.0.0.1", port: int = 8765) -> Threadin
             try:
                 if method == "GET" and (path == "/" or path.startswith("/static/")):
                     return self._static(path)
-                if method == "GET" and (m := events_route.fullmatch(path)):
-                    return self._events(unquote(m.group(1)), query)
+                if method == "GET":
+                    for pattern, find in events_routes:
+                        if m := pattern.fullmatch(path):
+                            return self._events(find(unquote(m.group(1))), query)
                 for route_method, pattern, handler in routes:
                     if route_method == method and (m := pattern.fullmatch(path)):
                         body = self._body() if method in ("POST", "PUT") else {}
