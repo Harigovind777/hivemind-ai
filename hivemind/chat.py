@@ -16,6 +16,7 @@ from .agents import Team, Transcript
 from .domains.code import CodeTask, doc_example_cases
 
 _FENCE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.DOTALL)
+_CANDIDATE = re.compile(r"candidate (\d+)")
 _READING = re.compile(r"\b(QUESTION|CHANGE)\b")
 
 _SPEC_FORM = (
@@ -37,6 +38,23 @@ class SpecError(ValueError):
     def __init__(self, message: str, line: int | None = None):
         super().__init__(message)
         self.line = line
+
+
+class ModelCallFailed(RuntimeError):
+    """A chat model call failed, so the action stops (and can be retried) instead of treating
+    the empty reply as an answer."""
+
+
+_CALLER = {"research": "Research agent", "coordinator": "Coordinator"}
+
+
+def _ask(team: Team, role: str, prompt: str, transcript: Transcript, phase: str, seed: int) -> str:
+    """`Agent.ask` records a failed call as an empty reply; for chat, failing loudly is right."""
+    reply = team[role].ask(prompt, transcript=transcript, phase=phase, seed=seed)
+    error = transcript.turns[-1].get("error")
+    if error:
+        raise ModelCallFailed(f"The {_CALLER[role]}'s model call failed: {error}")
+    return reply
 
 
 @dataclass(frozen=True)
@@ -70,11 +88,16 @@ def validate_spec(text: str) -> Spec:
 
     A trailing `pass` or `...` is dropped, since the pipeline adds its own stub.
     """
-    text = text.expandtabs(4)
+    # Python numbers lines by "\n" only; str.splitlines() would also break on form feeds,
+    # U+2028 and friends inside the docstring and cut the spec short.
+    text = text.replace("\r\n", "\n").replace("\r", "\n").expandtabs(4)
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
         raise SpecError(f"Line {exc.lineno}: {exc.msg}", exc.lineno) from None
+    except UnicodeError:  # e.g. half of an emoji pasted on its own
+        raise SpecError("The spec has characters that are not valid text; retype the odd "
+                        "characters") from None
     functions: list[ast.FunctionDef] = []
     for node in tree.body:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -105,7 +128,7 @@ def validate_spec(text: str) -> Spec:
     doc = fn.body[0]
     if doc.col_offset != 4:
         raise SpecError(f"Line {doc.lineno}: indent the docstring by 4 spaces", doc.lineno)
-    clean = "\n".join(text.splitlines()[: doc.end_lineno]) + "\n"
+    clean = "\n".join(text.split("\n")[: doc.end_lineno]) + "\n"
     examples = len(doc_example_cases(CodeTask("spec", clean, fn.name, "", "")))
     return Spec(clean, fn.name, examples)
 
@@ -134,8 +157,7 @@ def draft_spec(team: Team, message: str, transcript: Transcript, current_spec: s
         if error:
             prompt += (f"\n\nYour previous reply could not be used ({error}). Reply again with "
                        f"one ```python block in exactly that form.")
-        text = spec_text(team["research"].ask(prompt, transcript=transcript, phase="draft",
-                                              seed=seed + attempt))
+        text = spec_text(_ask(team, "research", prompt, transcript, "draft", seed + attempt))
         try:
             spec = validate_spec(text)
         except SpecError as exc:
@@ -148,13 +170,14 @@ def draft_spec(team: Team, message: str, transcript: Transcript, current_spec: s
 def classify(team: Team, message: str, context: str, transcript: Transcript, seed: int = 0) -> str:
     """Is a follow-up a QUESTION about the answer or a CHANGE to the problem? Unclear means
     question: answering is cheap and nothing re-runs."""
-    reply = team["coordinator"].ask(
+    reply = _ask(
+        team, "coordinator",
         f"The team solved the problem below. Then the user sent a new message. Decide whether "
         f"the user is asking a QUESTION (about the problem, the answer or how the team got there) "
         f"or asking for a CHANGE to the problem (different behaviour, a new requirement, other "
         f"inputs or outputs).\n\n{context}\n\nThe user's new message:\n{message}\n\n"
         f"Reply with one word: QUESTION or CHANGE.",
-        transcript=transcript, phase="classify", seed=seed)
+        transcript, "classify", seed)
     found = _READING.findall(reply)
     return "change" if found and found[-1] == "CHANGE" else "question"
 
@@ -168,12 +191,18 @@ def answer_question(team: Team, message: str, context: str, history: list[tuple[
               f"outputs where they help.\n\n{context}\n\n"
               + (f"Earlier questions about this answer:\n{earlier}" if history else "")
               + f"The user's question:\n{message}")
-    return team["coordinator"].ask(prompt, transcript=transcript, phase="question", seed=seed)
+    return _ask(team, "coordinator", prompt, transcript, "question", seed)
+
+
+def display_source(source: str) -> str:
+    """Where an answer came from, counting candidates from 1 as the page does
+    ("candidate 0" is shown as "candidate 1")."""
+    return _CANDIDATE.sub(lambda m: f"candidate {int(m.group(1)) + 1}", source)
 
 
 def round_context(spec: str, answer: dict) -> str:
     """What the Coordinator knows about a finished round, as prompt text."""
-    how = answer["source"] + (" (kept because it passes more verified cases)"
+    how = display_source(answer["source"]) + (" (kept because it passes more verified cases)"
                               if answer["repaired"] else "")
     parts = [
         f"Specification:\n```python\n{spec.rstrip()}\n```",

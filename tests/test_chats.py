@@ -170,3 +170,26 @@ def test_unreadable_chat_files_are_skipped(tmp_path):
     (tmp_path / "chats").mkdir()
     (tmp_path / "chats" / "broken.json").write_text("{not json")
     assert load_chats(tmp_path / "chats") == []
+
+
+def failing_build():
+    def respond(system, prompt):
+        raise TimeoutError("timed out")
+    return chat_coordinator(respond)
+
+
+def test_a_failed_model_call_fails_the_action_so_it_can_be_retried(chat):
+    chat.send("add one", failing_build)
+    settle(chat)
+    assert "model call failed" in last(chat, "error")["message"]
+    assert last(chat, "done")["status"] == "failed" and "spec" not in kinds(chat)
+    chat.retry(chat_coordinator)
+    settle(chat)
+    assert last(chat, "spec")["text"] == SPEC
+
+
+def test_a_failed_classification_is_not_recorded_as_a_reading(chat):
+    answered(chat).send("why candidate 1?", failing_build)
+    settle(chat)
+    assert "classified" not in kinds(chat) and "question_answer" not in kinds(chat)
+    assert last(chat, "done")["status"] == "failed"
