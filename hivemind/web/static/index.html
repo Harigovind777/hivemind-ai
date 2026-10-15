@@ -13,6 +13,7 @@
 <header class="bar">
   <div class="brand"><span class="mark" aria-hidden="true"></span>HiveMind</div>
   <nav class="tabs" aria-label="Sections">
+    <a href="#chat" data-tab="chat">Chat</a>
     <a href="#run" data-tab="run">Run</a>
     <a href="#agents" data-tab="agents">Agents</a>
     <a href="#experiments" data-tab="experiments">Experiments</a>
@@ -23,6 +24,38 @@
 <p class="offline" id="offline" hidden>Can't reach the HiveMind server. Check that <code>python -m hivemind serve</code> is still running, then reload.</p>
 
 <main>
+  <!-- Chat: your own problem, in plain English -->
+  <section class="tab" id="tab-chat" hidden>
+    <div class="two-col">
+      <aside class="panel side-list">
+        <h2>Chats</h2>
+        <div class="field">
+          <label for="chat-config">Config for a new chat</label>
+          <select id="chat-config"></select>
+        </div>
+        <div class="actions"><button type="button" class="primary" id="chat-new">New chat</button></div>
+        <ul class="list" id="chat-list"></ul>
+      </aside>
+      <div class="chat-main">
+        <div class="chat-thread" id="chat-thread">
+          <div class="empty">
+            <h3>Give the team a problem</h3>
+            <p>Describe a Python function in plain English, for example "a function that returns the second largest number in a list". The Research agent turns it into a spec you can check and edit. Press Go and the team solves it, settling disagreements with evidence. Then ask about the answer or ask for a change.</p>
+          </div>
+        </div>
+        <form class="chat-composer" id="chat-form" autocomplete="off">
+          <ul class="fixes" id="chat-problems" hidden></ul>
+          <textarea id="chat-input" rows="2" aria-label="Message" placeholder="Describe a function, ask about the answer, or ask for a change"></textarea>
+          <div class="actions">
+            <button type="submit" class="primary" id="chat-send">Send</button>
+            <button type="button" id="chat-cancel" hidden>Cancel</button>
+            <span class="hint" id="chat-state" aria-live="polite">Enter sends, Shift+Enter starts a new line.</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
   <!-- Run: one problem, live -->
   <section class="tab" id="tab-run" hidden>
     <div class="run-layout">
@@ -150,5 +183,6 @@
   </section>
 </main>
 <script src="/static/app.js"></script>
+<script src="/static/chat.js"></script>
 </body>
 </html>

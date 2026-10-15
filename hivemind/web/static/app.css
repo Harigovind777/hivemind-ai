@@ -229,6 +229,40 @@ pre.log { margin: 0; max-height: 260px; overflow: auto; padding: 10px 12px; back
 .task-buttons button[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 pre.report { margin: 0; padding: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; line-height: 1.5; max-height: 520px; overflow: auto; }
 
+/* Chat tab */
+textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 8px 10px; width: 100%; min-width: 0; resize: vertical; }
+textarea:hover { border-color: var(--muted); }
+textarea.code-edit { font-family: var(--font-code); font-size: 13px; line-height: 1.55; tab-size: 4; background: var(--paper); }
+textarea.code-edit:read-only { color: var(--muted); }
+.chat-main { display: grid; min-width: 0; align-content: start; }
+.chat-thread { display: grid; min-width: 0; padding-bottom: 12px; }
+.chat-head { display: grid; gap: 4px; padding: 4px 0 14px; }
+.chat-head h2 { font-size: 20px; overflow-wrap: anywhere; }
+.bubble.user { justify-self: end; max-width: min(72ch, 85%); margin: 16px 0 6px; padding: 10px 14px;
+  background: var(--accent-soft); border-radius: 14px 14px 4px 14px; }
+.bubble.user .prose { font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+.reading { justify-self: end; margin: 0 0 6px; }
+.spec-card[data-state="superseded"] { opacity: .6; }
+details.round { border-top: 1px solid var(--rule); padding: 14px 0 6px; }
+details.round > summary { font-size: 14px; }
+details.round > .feed { padding-left: 14px; border-left: 2px solid var(--rule); }
+.answer-card { border-top: 2px solid var(--pass); }
+.answer-card.failed { border-top-color: var(--fail); }
+.answer-card .verified { font-weight: 500; }
+.answer-card.failed .verified { color: var(--fail); }
+.failures h4 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.failures ul { padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.retry { padding: 8px 0; }
+.chat-composer { position: sticky; bottom: 0; z-index: 2; display: grid; gap: 8px;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--rule); }
+.chat-composer textarea { min-height: 3.2em; max-height: 40vh; }
+
+@media (max-width: 480px) {
+  .tabs { gap: 0; max-width: 100%; overflow-x: auto; }
+  .tabs a { padding: 6px 8px; }
+}
+
 @media (max-width: 900px) {
   .run-layout, .two-col { grid-template-columns: minmax(0, 1fr); }
   .side, .side-list { position: static; max-height: none; }
