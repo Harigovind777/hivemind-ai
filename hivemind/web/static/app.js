@@ -90,6 +90,9 @@ function describePhase(phase) {
     case 'debate': return [`Debate, candidate ${Number(b) + 1}`, "For the debate baseline: reads the teammates' code, points out bugs and revises. Nothing is run."];
     case 'judge': return ['Debate verdict', 'Picks the debate winner from code and arguments alone, without running anything.'];
     case 'review': return [`${ROLE_NAMES[a] || a} review`, 'Reads the final answer chosen by arbitration.'];
+    case 'draft': return ['Spec draft', 'Turns your request into a function signature, a docstring and examples.'];
+    case 'classify': return ['Reading your message', 'Decides whether you asked a question or asked for a change.'];
+    case 'question': return ['Answer', "Answers from the round's evidence."];
     default: return [String(phase), ''];
   }
 }
@@ -222,9 +225,9 @@ async function refreshStatus() {
     : ['bad', 'Ollama not running']);
   items.push(s.claude.available ? ['ok', `Claude credentials from ${s.claude.source}`] : ['', 'No Claude credentials']);
   if (s.current) {
-    items.push(['busy', s.current.kind === 'live'
-      ? `Running ${s.current.task_id}`
-      : `Experiment ${s.current.done} of ${s.current.total}`]);
+    items.push(['busy', s.current.kind === 'live' ? `Running ${s.current.task_id}`
+      : s.current.kind === 'chat' ? 'Chat round running'
+        : `Experiment ${s.current.done} of ${s.current.total}`]);
   }
   $('#health').replaceChildren(...items.map(([cls, text]) => h('span', { class: cls }, text)));
 
@@ -245,14 +248,15 @@ async function refreshStatus() {
 
 /* ------------------------------------------------------------------ tabs */
 
-const TABS = ['run', 'agents', 'experiments', 'results'];
+const TABS = ['chat', 'run', 'agents', 'experiments', 'results'];
 
 function showTab() {
-  const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'run';
+  const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'chat';
   for (const name of TABS) $(`#tab-${name}`).hidden = name !== tab;
   $$('.tabs a').forEach((a) => (a.dataset.tab === tab ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
   if (tab === 'results') loadResults();
   if (tab === 'agents' && !state.formBase && state.configs.length) openConfig(state.selectedConfig || defaultConfig());
+  if (tab === 'chat') showChatTab();
 }
 
 /* ------------------------------------------------------------------ configs (shared) */
@@ -270,7 +274,7 @@ function modelsLine(c) {
 
 async function loadConfigs() {
   state.configs = await api('GET', '/api/configs');
-  for (const sel of [$('#run-config'), $('#exp-config')]) {
+  for (const sel of [$('#run-config'), $('#exp-config'), $('#chat-config')]) {
     const keep = sel.value;
     sel.replaceChildren(...state.configs.map((c) =>
       h('option', { value: c.name }, c.name + (Object.keys(c.errors || {}).length ? ' (has errors)' : ''))));
@@ -448,11 +452,14 @@ function updateRunButtons() {
   const live = state.live;
   const liveRunning = !!(live && !live.finished);
   const current = state.status && state.status.current;
-  const busyElsewhere = !!(current && current.kind === 'experiment');
+  const busyElsewhere = !!(current && current.kind !== 'live');
   $('#run-start').disabled = liveRunning || busyElsewhere || !state.runReady || !taskFromInput();
   $('#run-cancel').hidden = !liveRunning;
-  if (busyElsewhere && !liveRunning) setRunState('An experiment is running. Runs start again when it finishes or is cancelled on the Experiments tab.');
-  else if (!liveRunning && $('#run-state').textContent.startsWith('An experiment')) setRunState('');
+  if (busyElsewhere && !liveRunning) {
+    setRunState(current.kind === 'chat'
+      ? 'A chat round is running. Runs start again when it finishes or is cancelled on the Chat tab.'
+      : 'An experiment is running. Runs start again when it finishes or is cancelled on the Experiments tab.');
+  } else if (!liveRunning && /^(An experiment|A chat round)/.test($('#run-state').textContent)) setRunState('');
 }
 
 $('#run-task').addEventListener('input', updateTaskSummary);
@@ -880,4 +887,4 @@ async function init() {
   setInterval(refreshStatus, 4000);
 }
 
-init();
+document.addEventListener('DOMContentLoaded', init);  // after chat.js has loaded too

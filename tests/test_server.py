@@ -78,8 +78,11 @@ def test_the_page_and_its_files_are_served(serve):
     with urllib.request.urlopen(base + "/") as resp:
         html = resp.read().decode()
     assert resp.headers["Content-Type"].startswith("text/html")
-    assert "/static/app.js" in html and "/static/app.css" in html
+    assert "/static/app.js" in html and "/static/app.css" in html and "/static/chat.js" in html
+    assert html.index('data-tab="chat"') < html.index('data-tab="run"')
     with urllib.request.urlopen(base + "/static/app.js") as resp:
+        assert resp.headers["Content-Type"].startswith("text/javascript")
+    with urllib.request.urlopen(base + "/static/chat.js") as resp:
         assert resp.headers["Content-Type"].startswith("text/javascript")
     for bad in ("/static/../server.py", "/static/%2e%2e/server.py", "/static/missing.js"):
         with pytest.raises(urllib.error.HTTPError) as err:
