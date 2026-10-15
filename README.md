@@ -59,6 +59,12 @@ pytest                                                  # offline tests, ~10 s
 python -m hivemind serve        # opens http://127.0.0.1:8765
 ```
 
+- **Chat**: describe a Python function in plain English. The Research agent drafts a spec
+  (signature, docstring, examples) that you can edit; press Go and the team solves it with
+  evidence-based arbitration, streaming every step. Then ask about the answer or ask for a
+  change; the Coordinator works out which, and you can switch it. Chats are saved in
+  `runs/chats/`. Your own problems have no hidden tests, so the answer shows the verified
+  cases it passes instead of pass/fail.
 - **Run**: pick a problem and a config, then watch every agent's message, the sandbox evidence
   and the Coordinator's rulings appear live, ending with pass/fail for all seven strategies.
 - **Agents**: edit configs: the team model, the Coordinator model, an optional model per role,
@@ -67,7 +73,7 @@ python -m hivemind serve        # opens http://127.0.0.1:8765
   Launching the same config again continues where it stopped.
 - **Results**: every run's strategy table, evidence numbers, report, and transcript replays.
 
-It listens only on your own computer and runs one job at a time. Windows support is still to come:
+It listens only on your own computer and runs one job at a time (a live run, an experiment or a chat round; drafting and answering questions in a chat can happen alongside). Windows support is still to come:
 the code sandbox uses Mac/Linux-only features.
 
 **Free local pilot** (no API key). Install [Ollama](https://ollama.com), then:
@@ -121,7 +127,8 @@ hivemind/
   llm.py           Claude / Ollama / scripted providers behind one interface
   runner.py        experiment runner (parallel, resumable)
   config.py        config validation and saving (used by the web interface)
-  web/             `serve`: HTTP server, live runs, experiment jobs, readiness checks, static UI
+  chat.py          chat calls: spec drafting and checking, reading follow-ups, answers
+  web/             `serve`: HTTP server, live runs, chats, experiment jobs, readiness checks, static UI
   report.py        report.md: models, procedure, results, McNemar tests, diagnostics
 configs/           pilot-local.toml (free), claude-main.toml (headline run)
 data/              HumanEval (MIT licence, © OpenAI)
