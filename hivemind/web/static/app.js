@@ -203,7 +203,7 @@ function systemEntry(title, text, failed) {
 
 const state = {
   status: null, tasks: [], configs: [], live: null, runReady: false,
-  jobId: null, jobTimer: null, formBase: null, selectedConfig: null,
+  jobId: null, jobTimer: null, formBase: null, selectedConfig: null, backends: null,
 };
 
 /* ------------------------------------------------------------------ status bar */
@@ -227,6 +227,14 @@ async function refreshStatus() {
       : `Experiment ${s.current.done} of ${s.current.total}`]);
   }
   $('#health').replaceChildren(...items.map(([cls, text]) => h('span', { class: cls }, text)));
+
+  // Readiness depends on Ollama and Claude, so check it again when either comes or goes.
+  const backends = JSON.stringify([s.ollama.reachable, s.ollama.models, s.claude.available]);
+  if (state.backends !== null && backends !== state.backends) {
+    checkRunConfig();
+    checkExpConfig();
+  }
+  state.backends = backends;
 
   const cur = s.current;
   if (cur && cur.kind === 'live' && (!state.live || state.live.id !== cur.id)) attachLive(cur.id);
@@ -679,6 +687,18 @@ async function updateExpForm() {
     const run = body.config.run || {};
     $('#exp-n').value = run.n_tasks || 164;
     $('#exp-where').textContent = `Results go to runs/${run.name}. Problems already there are skipped, so launching again continues a stopped run.`;
+  } catch (err) {
+    state.expReady = showFixes($('#exp-problems'), { problems: [err.message] });
+    updateExpButton();
+    return;
+  }
+  await checkExpConfig();
+}
+
+async function checkExpConfig() {
+  const name = $('#exp-config').value;
+  if (!name) return;
+  try {
     state.expReady = showFixes($('#exp-problems'), await api('GET', `/api/configs/${encodeURIComponent(name)}/readiness`));
   } catch (err) {
     state.expReady = showFixes($('#exp-problems'), { problems: [err.message] });
