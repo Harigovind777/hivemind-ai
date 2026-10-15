@@ -1,12 +1,12 @@
 # HiveMind run report: `pilot-local-qwen2.5-coder-3b`
 
-Generated 2026-10-06 from `pilot-local-qwen2.5-coder-3b/`. Benchmark: **HumanEval**, 5 tasks (seeded random sample, sample_seed=0). Graded by the benchmark's hidden unit tests, which no agent ever sees.
+Generated 2026-10-15 from `pilot-local-qwen2.5-coder-3b/`. Benchmark: **HumanEval**, 30 tasks (seeded random sample, sample_seed=0). Graded by the benchmark's hidden unit tests, which no agent ever sees.
 
 ## Models used
 
 | Provider | Model | Roles | Calls | Failed calls | Input tokens | Output tokens | Avg latency | Cost (USD) |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| ollama | `qwen2.5-coder:3b` | coding, coordinator, research, testing | 55 | 0 | 26,189 | 15,883 | 8.9s | $0.00 |
+| ollama | `qwen2.5-coder:3b` | coding, coordinator, research, testing | 341 | 0 | 187,055 | 98,798 | 12.3s | $0.00 |
 
 Agent settings: temperature=0.7, max_tokens=1024. Coordinator settings: temperature=0.2, max_tokens=1024.
 Local (Ollama) models cost nothing per call; Claude costs use list prices.
@@ -38,36 +38,36 @@ Debate rounds: 1. Repair round: on.
 
 | Strategy | Passed | Pass rate | 95% CI (Wilson) | Model calls / task | Tokens / task |
 |---|---:|---:|---|---:|---:|
-| `solo` | 5/5 | 100.0% | 56.6%–100.0% | 1.0 | 364 |
-| `first` | 4/5 | 80.0% | 37.6%–96.4% | 2.0 | 1,111 |
-| `vote` | 5/5 | 100.0% | 56.6%–100.0% | 5.0 | 2,845 |
-| `debate` | 5/5 | 100.0% | 56.6%–100.0% | 8.0 | 7,058 |
-| `tests_only` | 5/5 | 100.0% | 56.6%–100.0% | 5.0 | 2,845 |
-| `arbitration_select` | 5/5 | 100.0% | 56.6%–100.0% | 5.6 | 3,083 |
-| `arbitration` | 5/5 | 100.0% | 56.6%–100.0% | 6.0 | 3,465 |
+| `solo` | 25/30 | 83.3% | 66.4%–92.7% | 1.0 | 443 |
+| `first` | 20/30 | 66.7% | 48.8%–80.8% | 2.0 | 1,173 |
+| `vote` | 24/30 | 80.0% | 62.7%–90.5% | 5.0 | 3,103 |
+| `debate` | 24/30 | 80.0% | 62.7%–90.5% | 8.0 | 7,676 |
+| `tests_only` | 27/30 | 90.0% | 74.4%–96.5% | 5.0 | 3,103 |
+| `arbitration_select` | 24/30 | 80.0% | 62.7%–90.5% | 5.8 | 3,539 |
+| `arbitration` | 25/30 | 83.3% | 66.4%–92.7% | 6.4 | 4,088 |
 
-**Oracle** (at least one of the 3 candidates is correct): 5/5 (100.0%). This is the ceiling for any strategy that only *selects* a candidate; repair and debate can exceed it.
+**Oracle** (at least one of the 3 candidates is correct): 27/30 (90.0%). This is the ceiling for any strategy that only *selects* a candidate; repair and debate can exceed it.
 
 ## Arbitration vs. each baseline (paired, same tasks)
 
 | Baseline | Arbitration right, baseline wrong | Baseline right, arbitration wrong | Exact McNemar p |
 |---|---:|---:|---:|
-| `solo` | 0 | 0 | 1.000 |
-| `first` | 1 | 0 | 1.000 |
-| `vote` | 0 | 0 | 1.000 |
-| `debate` | 0 | 0 | 1.000 |
-| `tests_only` | 0 | 0 | 1.000 |
-| `arbitration_select` | 0 | 0 | 1.000 |
+| `solo` | 3 | 3 | 1.000 |
+| `first` | 7 | 2 | 0.180 |
+| `vote` | 3 | 2 | 1.000 |
+| `debate` | 2 | 1 | 1.000 |
+| `tests_only` | 0 | 2 | 0.500 |
+| `arbitration_select` | 1 | 0 | 1.000 |
 
 ## Evidence diagnostics
 
-- Tasks where candidates behaved differently: 1/5
-- Tasks needing a ruling: 3/5; disputed cases: 9
-- Coordinator rulings: 9 decided, 0 unsure
-- Rulings that agree with the benchmark's reference solution (analysis only): 7/9 (77.8%)
-- Testing agent's expected values that were actually correct: 21/26 (80.8%)
-- Docstring example cases used as trusted evidence: 12
-- Repairs attempted: 2; accepted (verified score improved): 1
+- Tasks where candidates behaved differently: 15/30
+- Tasks needing a ruling: 24/30; disputed cases: 81
+- Coordinator rulings: 76 decided, 5 unsure
+- Rulings that agree with the benchmark's reference solution (analysis only): 36/76 (47.4%)
+- Testing agent's expected values that were actually correct: 171/217 (78.8%)
+- Docstring example cases used as trusted evidence: 23
+- Repairs attempted: 17; accepted (verified score improved): 2
 - Candidates flagged by the static security check: 0
 
 ## Per-task results
@@ -79,9 +79,34 @@ Debate rounds: 1. Repair round: on.
 | HumanEval/24 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | HumanEval/25 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | HumanEval/35 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/37 | ✓ | · | · | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/52 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/55 | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/64 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/66 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/72 | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/77 | · | · | · | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/79 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/80 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/84 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/90 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/91 | · | · | · | · | · | · | · | · |
+| HumanEval/98 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/103 | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/107 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/111 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/120 | ✓ | · | · | · | · | · | · | · |
+| HumanEval/122 | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | ✓ |
+| HumanEval/124 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/129 | · | · | · | ✓ | ✓ | · | ✓ | ✓ |
+| HumanEval/130 | · | · | · | · | · | · | · | · |
+| HumanEval/136 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/142 | ✓ | ✓ | ✓ | · | ✓ | · | · | ✓ |
+| HumanEval/149 | · | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/150 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ## How to read this
 
-- This is a **pilot** with 5 tasks: the confidence intervals are wide and a p-value above 0.05 means the run cannot distinguish the strategies yet. Its job is to show the pipeline works end to end and to estimate cost per task.
+- This is a **pilot** with 30 tasks: the confidence intervals are wide and a p-value above 0.05 means the run cannot distinguish the strategies yet. Its job is to show the pipeline works end to end and to estimate cost per task.
 - Agents ran on a small local model, not Claude. Absolute pass rates are lower than Claude's; the headline experiment reruns this config with Claude.
 - Rulings and Testing-agent accuracy are scored against the benchmark's reference solution purely for analysis; no agent sees the reference or the hidden tests.

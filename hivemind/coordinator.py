@@ -103,6 +103,47 @@ class TaskOutcome:
         return asdict(self)
 
 
+@dataclass
+class ChatAnswer:
+    """The team's answer to a problem with no hidden tests (the Chat tab)."""
+
+    code: str
+    source: str
+    candidates: list[str]
+    unsafe: list[bool]
+    working: bool            # the final code produced a result on at least one case
+    verified_total: int
+    verified_passed: int
+    spec_cases: int          # verified cases taken from the spec's own examples
+    ruled_cases: int         # verified by a Coordinator ruling
+    undisputed_cases: int    # verified because no one disagreed
+    failures: list[dict]     # verified cases the final code fails: call, expected, got
+    rulings: list[dict]
+    distinct_behaviours: int
+    repaired: bool
+
+
+@dataclass
+class _Pool:
+    """The shared middle of a solve: candidates, their evidence, and arbitration's choice."""
+
+    candidates: list[str]
+    cases: list[Case]
+    results: list[list[CaseResult]]
+    unsafe: list[bool]
+    sigs: list[tuple]
+    cluster: list[int]
+    verified: dict[int, Rule]
+    rulings: list[tuple[int, Ruling, Rule | None]]
+    disputes: int
+    scores: list[int]
+    arb_code: str
+    arb_source: str
+    arb_results: list[CaseResult]  # the final code's results (the repair's, when it was kept)
+    failing: list[int]             # verified cases the pick failed before any repair
+    repaired: bool
+
+
 class Coordinator:
     def __init__(self, team: Team, n_candidates: int = 3, debate_rounds: int = 1,
                  repair: bool = True, seed: int = 0, max_disputes: int = 8):
@@ -115,53 +156,21 @@ class Coordinator:
 
     # ------------------------------------------------------------------ pipeline
 
-    def solve(self, task: CodeTask, review: bool = False) -> tuple[TaskOutcome, Transcript]:
-        tr = Transcript(task.task_id)
-        seed = (self.seed * 7919 + zlib.crc32(task.task_id.encode())) % 2**31
+    def solve(self, task: CodeTask, review: bool = False, on_event=None,
+              cancel=None) -> tuple[TaskOutcome, Transcript]:
+        """Solve one task. `on_event` receives live progress events (see Transcript.emit);
+        setting the `cancel` Event stops the run before its next model call."""
+        tr = Transcript(task.task_id, on_event=on_event, cancel=cancel)
+        seed = self._seed(task)
         ask = self._asker(tr)
 
         solo = self._code(ask("coding", self._coder_prompt(task), "solo", seed), task)
-        brief = ask("research", f"Analyse this function specification for the team.\n\n{task.spec}",
-                    "brief", seed)
-        candidates = [
-            self._code(ask("coding", self._coder_prompt(task, brief, APPROACH_HINTS[i % len(APPROACH_HINTS)]),
-                           f"candidate:{i}", seed + 1 + i), task)
-            for i in range(self.k)
-        ]
-        tests_text = ask("testing", self._tester_prompt(task), "tests", seed)
-        cases = self._cases(task, tests_text)
-        case_dicts = [{"call": c.call, "expected": c.expected} for c in cases]
-        results = [run_cases(build_program(task, c), case_dicts) for c in candidates]
-        unsafe = [bool(static_scan(c)) for c in candidates]
-
-        sigs = [tuple(r.signature for r in res) for res in results]
-        runnable = [not res or any(r.is_answer for r in res) for res in results]
-        # Programs that never produce a result cannot form a voting bloc.
-        cluster = [sum(s == t and ok for t, ok in zip(sigs, runnable)) if runnable[i] else 0
-                   for i, s in enumerate(sigs)]
+        pool = self._pool(task, ask, seed, tr)
+        candidates, results, unsafe, cluster = pool.candidates, pool.results, pool.unsafe, pool.cluster
         vote_pick = min(range(self.k), key=lambda i: (unsafe[i], -cluster[i], i))
-
         stated = [sum(r.passed is True for r in res) for res in results]
         tests_pick = min(range(self.k), key=lambda i: (unsafe[i], -stated[i], -cluster[i], i))
-
-        verified, rulings, disputes = self._arbitrate(task, cases, results, ask, seed)
-
-        def score(res: list[CaseResult]) -> int:
-            return sum(_satisfies(rule, res[j]) for j, rule in verified.items())
-
-        scores = [score(res) for res in results]
-        arb_pick = min(range(self.k), key=lambda i: (unsafe[i], -scores[i], -cluster[i], i))
-        arb_code, arb_source = candidates[arb_pick], f"candidate {arb_pick}"
-        failing = [j for j, rule in verified.items() if not _satisfies(rule, results[arb_pick][j])]
-        repaired = False
-        if self.repair and failing:
-            fixed = self._code(ask("coding", self._repair_prompt(task, arb_code, cases, verified,
-                                                                  results[arb_pick], failing),
-                                   "repair", seed + 50), task)
-            if fixed and not static_scan(fixed):
-                fixed_score = score(run_cases(build_program(task, fixed), case_dicts))
-                if fixed_score > scores[arb_pick]:
-                    arb_code, arb_source, repaired = fixed, f"repair of candidate {arb_pick}", True
+        arb_pick = int(pool.arb_source.rsplit(" ", 1)[1])
 
         debate_code, debate_source = self._debate(task, candidates, ask, seed)
 
@@ -180,7 +189,7 @@ class Coordinator:
             "debate": (debate_code, debate_source),
             "tests_only": (candidates[tests_pick], f"candidate {tests_pick}"),
             "arbitration_select": (candidates[arb_pick], f"candidate {arb_pick}"),
-            "arbitration": (arb_code, arb_source),
+            "arbitration": (pool.arb_code, pool.arb_source),
         }
         outcome = TaskOutcome(
             task_id=task.task_id,
@@ -188,12 +197,84 @@ class Coordinator:
             candidate_passed=candidate_passed,
             answers={name: {"code": code, "source": src, "passed": graded(code)}
                      for name, (code, src) in answers.items()},
-            diagnostics=self._diagnostics(task, cases, sigs, unsafe, rulings, disputes, scores,
-                                          failing, repaired),
+            diagnostics=self._diagnostics(task, pool.cases, pool.sigs, unsafe, pool.rulings,
+                                          pool.disputes, pool.scores, pool.failing, pool.repaired),
         )
         if review:
-            outcome.review = self.review(task, arb_code, ask, seed)
+            outcome.review = self.review(task, pool.arb_code, ask, seed)
         return outcome, tr
+
+    def answer(self, task: CodeTask, on_event=None, cancel=None) -> tuple[ChatAnswer, Transcript]:
+        """The shared steps alone, for a problem with no hidden tests: no solo baseline, no
+        debate, no grading. Used by the Chat tab."""
+        tr = Transcript(task.task_id, on_event=on_event, cancel=cancel)
+        pool = self._pool(task, self._asker(tr), self._seed(task), tr)
+        failures = [{"call": pool.cases[j].call, "expected": self._expected(pool.cases[j], rule),
+                     "got": pool.arb_results[j].signature}
+                    for j, rule in sorted(pool.verified.items())
+                    if not _satisfies(rule, pool.arb_results[j])]
+        spec_cases = sum(c.source == "spec" for c in pool.cases)
+        ruled = sum(rule is not None for _, _, rule in pool.rulings)
+        working = bool(pool.arb_code) and (not pool.arb_results
+                                           or any(r.is_answer for r in pool.arb_results))
+        answer = ChatAnswer(
+            code=pool.arb_code, source=pool.arb_source, candidates=pool.candidates,
+            unsafe=pool.unsafe, working=working,
+            verified_total=len(pool.verified), verified_passed=len(pool.verified) - len(failures),
+            spec_cases=spec_cases, ruled_cases=ruled,
+            undisputed_cases=len(pool.verified) - spec_cases - ruled,
+            failures=failures, rulings=[asdict(r) for _, r, _ in pool.rulings],
+            distinct_behaviours=len(set(pool.sigs)), repaired=pool.repaired)
+        return answer, tr
+
+    def _pool(self, task: CodeTask, ask, seed: int, tr: Transcript) -> _Pool:
+        """Brief, candidates, team tests, sandbox, arbitration and repair: the steps every
+        strategy and the Chat tab share."""
+        brief = ask("research", f"Analyse this function specification for the team.\n\n{task.spec}",
+                    "brief", seed)
+        candidates = [
+            self._code(ask("coding", self._coder_prompt(task, brief, APPROACH_HINTS[i % len(APPROACH_HINTS)]),
+                           f"candidate:{i}", seed + 1 + i), task)
+            for i in range(self.k)
+        ]
+        tests_text = ask("testing", self._tester_prompt(task), "tests", seed)
+        cases = self._cases(task, tests_text)
+        case_dicts = [{"call": c.call, "expected": c.expected} for c in cases]
+        results = [run_cases(build_program(task, c), case_dicts) for c in candidates]
+        unsafe = [bool(static_scan(c)) for c in candidates]
+
+        sigs = [tuple(r.signature for r in res) for res in results]
+        tr.emit("evidence", candidates=self.k, cases=len(cases),
+                spec_cases=sum(c.source == "spec" for c in cases),
+                tester_cases=sum(c.source == "tester" for c in cases),
+                distinct_behaviours=len(set(sigs)), unsafe_candidates=sum(unsafe))
+        runnable = [not res or any(r.is_answer for r in res) for res in results]
+        # Programs that never produce a result cannot form a voting bloc.
+        cluster = [sum(s == t and ok for t, ok in zip(sigs, runnable)) if runnable[i] else 0
+                   for i, s in enumerate(sigs)]
+
+        verified, rulings, disputes = self._arbitrate(task, cases, results, ask, seed)
+        tr.emit("rulings", disputes=disputes, rulings=[asdict(r) for _, r, _ in rulings])
+
+        def score(res: list[CaseResult]) -> int:
+            return sum(_satisfies(rule, res[j]) for j, rule in verified.items())
+
+        scores = [score(res) for res in results]
+        arb_pick = min(range(self.k), key=lambda i: (unsafe[i], -scores[i], -cluster[i], i))
+        arb_code, arb_source, arb_results = candidates[arb_pick], f"candidate {arb_pick}", results[arb_pick]
+        failing = [j for j, rule in verified.items() if not _satisfies(rule, results[arb_pick][j])]
+        repaired = False
+        if self.repair and failing:
+            fixed = self._code(ask("coding", self._repair_prompt(task, arb_code, cases, verified,
+                                                                  results[arb_pick], failing),
+                                   "repair", seed + 50), task)
+            if fixed and not static_scan(fixed):
+                fixed_results = run_cases(build_program(task, fixed), case_dicts)
+                if score(fixed_results) > scores[arb_pick]:
+                    arb_code, arb_source, arb_results, repaired = (
+                        fixed, f"repair of candidate {arb_pick}", fixed_results, True)
+        return _Pool(candidates, cases, results, unsafe, sigs, cluster, verified, rulings, disputes,
+                     scores, arb_code, arb_source, arb_results, failing, repaired)
 
     def review(self, task: CodeTask, code: str, ask, seed: int) -> dict:
         """Review mode: the Security, Documentation and Ethics agents read the final answer."""
@@ -310,6 +391,14 @@ class Coordinator:
         def ask(role: str, prompt: str, phase: str, seed: int) -> str:
             return self.team[role].ask(prompt, transcript=tr, phase=phase, seed=seed)
         return ask
+
+    def _seed(self, task: CodeTask) -> int:
+        return (self.seed * 7919 + zlib.crc32(task.task_id.encode())) % 2**31
+
+    @staticmethod
+    def _expected(case: Case, rule: Rule) -> str:
+        """What a verified case requires, as text."""
+        return case.expected if rule[0] == "pass" else rule[1]
 
     @staticmethod
     def _code(text: str, task: CodeTask) -> str:

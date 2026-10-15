@@ -45,13 +45,36 @@ https://github.com/Harigovind777/hivemind-ai/invitations.
 
 ## Run it
 
-Requires Python 3.10+.
+Requires Python 3.11+.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-pytest                                                  # 19 offline tests, ~2 s
+pytest                                                  # offline tests, ~10 s
 ```
+
+**Web interface** (manage the agents and run them from a browser):
+
+```bash
+python -m hivemind serve        # opens http://127.0.0.1:8765
+```
+
+- **Chat**: describe a Python function in plain English. The Research agent drafts a spec
+  (signature, docstring, examples) that you can edit; press Go and the team solves it with
+  evidence-based arbitration, streaming every step. Then ask about the answer or ask for a
+  change; the Coordinator works out which, and you can switch it. Chats are saved in
+  `runs/chats/`. Your own problems have no hidden tests, so the answer shows the verified
+  cases it passes instead of pass/fail.
+- **Run**: pick a problem and a config, then watch every agent's message, the sandbox evidence
+  and the Coordinator's rulings appear live, ending with pass/fail for all seven strategies.
+- **Agents**: edit configs: the team model, the Coordinator model, an optional model per role,
+  and the pipeline settings. Configs are validated before they are saved.
+- **Experiments**: launch a full run as a background process, follow its progress, cancel it.
+  Launching the same config again continues where it stopped.
+- **Results**: every run's strategy table, evidence numbers, report, and transcript replays.
+
+It listens only on your own computer and runs one job at a time (a live run, an experiment or a chat round; drafting and answering questions in a chat can happen alongside). Windows support is still to come:
+the code sandbox uses Mac/Linux-only features.
 
 **Free local pilot** (no API key). Install [Ollama](https://ollama.com), then:
 
@@ -103,6 +126,9 @@ hivemind/
   domains/code.py  HumanEval loading, code extraction, test parsing, hidden-test grading
   llm.py           Claude / Ollama / scripted providers behind one interface
   runner.py        experiment runner (parallel, resumable)
+  config.py        config validation and saving (used by the web interface)
+  chat.py          chat calls: spec drafting and checking, reading follow-ups, answers
+  web/             `serve`: HTTP server, live runs, chats, experiment jobs, readiness checks, static UI
   report.py        report.md: models, procedure, results, McNemar tests, diagnostics
 configs/           pilot-local.toml (free), claude-main.toml (headline run)
 data/              HumanEval (MIT licence, © OpenAI)
