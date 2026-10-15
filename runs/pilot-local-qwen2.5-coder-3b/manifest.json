@@ -1,0 +1,23 @@
+{
+ "fingerprint": {
+  "benchmark": "humaneval",
+  "sample_seed": 0,
+  "candidates": 3,
+  "debate_rounds": 1,
+  "repair": true,
+  "seed": 0,
+  "agents": {
+   "provider": "ollama",
+   "model": "qwen2.5-coder:3b",
+   "temperature": 0.7,
+   "max_tokens": 1024
+  },
+  "coordinator": {
+   "provider": "ollama",
+   "model": "qwen2.5-coder:3b",
+   "temperature": 0.2,
+   "max_tokens": 1024
+  }
+ },
+ "note": "inferred from config.toml at resume time"
+}

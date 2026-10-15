@@ -1,12 +1,12 @@
 # HiveMind run report: `pilot-local-qwen2.5-coder-3b`
 
-Generated 2026-10-06 from `pilot-local-qwen2.5-coder-3b/`. Benchmark: **HumanEval**, 5 tasks (seeded random sample, sample_seed=0). Graded by the benchmark's hidden unit tests, which no agent ever sees.
+Generated 2026-10-15 from `pilot-local-qwen2.5-coder-3b/`. Benchmark: **HumanEval**, 7 tasks (seeded random sample, sample_seed=0). Graded by the benchmark's hidden unit tests, which no agent ever sees.
 
 ## Models used
 
 | Provider | Model | Roles | Calls | Failed calls | Input tokens | Output tokens | Avg latency | Cost (USD) |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| ollama | `qwen2.5-coder:3b` | coding, coordinator, research, testing | 55 | 0 | 26,189 | 15,883 | 8.9s | $0.00 |
+| ollama | `qwen2.5-coder:3b` | coding, coordinator, research, testing | 78 | 0 | 37,217 | 20,360 | 7.8s | $0.00 |
 
 Agent settings: temperature=0.7, max_tokens=1024. Coordinator settings: temperature=0.2, max_tokens=1024.
 Local (Ollama) models cost nothing per call; Claude costs use list prices.
@@ -38,37 +38,53 @@ Debate rounds: 1. Repair round: on.
 
 | Strategy | Passed | Pass rate | 95% CI (Wilson) | Model calls / task | Tokens / task |
 |---|---:|---:|---|---:|---:|
-| `solo` | 5/5 | 100.0% | 56.6%–100.0% | 1.0 | 364 |
-| `first` | 4/5 | 80.0% | 37.6%–96.4% | 2.0 | 1,111 |
-| `vote` | 5/5 | 100.0% | 56.6%–100.0% | 5.0 | 2,845 |
-| `debate` | 5/5 | 100.0% | 56.6%–100.0% | 8.0 | 7,058 |
-| `tests_only` | 5/5 | 100.0% | 56.6%–100.0% | 5.0 | 2,845 |
-| `arbitration_select` | 5/5 | 100.0% | 56.6%–100.0% | 5.6 | 3,083 |
-| `arbitration` | 5/5 | 100.0% | 56.6%–100.0% | 6.0 | 3,465 |
+| `solo` | 7/7 | 100.0% | 64.6%–100.0% | 1.0 | 373 |
+| `first` | 6/7 | 85.7% | 48.7%–97.4% | 2.0 | 1,083 |
+| `vote` | 7/7 | 100.0% | 64.6%–100.0% | 5.0 | 2,796 |
+| `debate` | 7/7 | 100.0% | 64.6%–100.0% | 8.0 | 6,736 |
+| `tests_only` | 7/7 | 100.0% | 64.6%–100.0% | 5.0 | 2,796 |
+| `arbitration_select` | 7/7 | 100.0% | 64.6%–100.0% | 5.7 | 3,094 |
+| `arbitration` | 7/7 | 100.0% | 64.6%–100.0% | 6.1 | 3,539 |
 
-**Oracle** (at least one of the 3 candidates is correct): 5/5 (100.0%). This is the ceiling for any strategy that only *selects* a candidate; repair and debate can exceed it.
+**Oracle** (at least one of the 3 candidates is correct): 7/7 (100.0%). This is the ceiling for any strategy that only *selects* a candidate; repair and debate can exceed it.
 
 ## Arbitration vs. each baseline (paired, same tasks)
 
-| Baseline | Arbitration right, baseline wrong | Baseline right, arbitration wrong | Exact McNemar p |
-|---|---:|---:|---:|
-| `solo` | 0 | 0 | 1.000 |
-| `first` | 1 | 0 | 1.000 |
-| `vote` | 0 | 0 | 1.000 |
-| `debate` | 0 | 0 | 1.000 |
-| `tests_only` | 0 | 0 | 1.000 |
-| `arbitration_select` | 0 | 0 | 1.000 |
+| Baseline | Arbitration right, baseline wrong | Baseline right, arbitration wrong | Exact McNemar p | Holm-corrected p |
+|---|---:|---:|---:|---:|
+| `solo` | 0 | 0 | 1.000 | 1.000 |
+| `first` | 1 | 0 | 1.000 | 1.000 |
+| `vote` | 0 | 0 | 1.000 | 1.000 |
+| `debate` | 0 | 0 | 1.000 | 1.000 |
+| `tests_only` | 0 | 0 | 1.000 | 1.000 |
+| `arbitration_select` | 0 | 0 | 1.000 | 1.000 |
+
+The Holm column corrects for the 6 comparisons in this table. Read that one: at these sample sizes an uncorrected p-value of 0.05 across six baselines is roughly what you expect by chance.
+
 
 ## Evidence diagnostics
 
-- Tasks where candidates behaved differently: 1/5
-- Tasks needing a ruling: 3/5; disputed cases: 9
-- Coordinator rulings: 9 decided, 0 unsure
-- Rulings that agree with the benchmark's reference solution (analysis only): 7/9 (77.8%)
-- Testing agent's expected values that were actually correct: 21/26 (80.8%)
+### Did the disagreement the method needs actually happen?
+
+- Tasks where candidates behaved differently: 1/7
+- Tasks needing a ruling: 5/7; disputed cases: 16
+- Distinct behaviours among the 3 candidates: 6 tasks with 1 distinct behaviours, 1 task with 2 distinct behaviours
+- Pool diversity: 38.1% of the maximum 3. **A low value here means arbitration had little to arbitrate**, so a flat result reflects a saturated candidate pool rather than a method that does not work.
+- Cases verified out of cases gathered: 16/16
+
+### Arbitration behaviour
+
+- Coordinator rulings: 16 decided, 0 unsure (the spec did not determine the answer)
+- Replies we could not parse: 0
+- Rulings that agree with the benchmark's reference solution (analysis only): 11/16 (68.8%)
+- Testing agent's expected values that were actually correct: 30/42 (71.4%)
 - Docstring example cases used as trusted evidence: 12
-- Repairs attempted: 2; accepted (verified score improved): 1
+- Repairs attempted: 3; accepted (verified score improved): 1
+
+### Failure and security audit
+
 - Candidates flagged by the static security check: 0
+- Final answers flagged, by strategy: 0 in total (solo: 0 tasks, debate: 0 tasks)
 
 ## Per-task results
 
@@ -79,9 +95,11 @@ Debate rounds: 1. Repair round: on.
 | HumanEval/24 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | HumanEval/25 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | HumanEval/35 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/98 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| HumanEval/107 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ## How to read this
 
-- This is a **pilot** with 5 tasks: the confidence intervals are wide and a p-value above 0.05 means the run cannot distinguish the strategies yet. Its job is to show the pipeline works end to end and to estimate cost per task.
+- This is a **pilot** with 7 tasks: the confidence intervals are wide and a p-value above 0.05 means the run cannot distinguish the strategies yet. Its job is to show the pipeline works end to end and to estimate cost per task.
 - Agents ran on a small local model, not Claude. Absolute pass rates are lower than Claude's; the headline experiment reruns this config with Claude.
 - Rulings and Testing-agent accuracy are scored against the benchmark's reference solution purely for analysis; no agent sees the reference or the hidden tests.

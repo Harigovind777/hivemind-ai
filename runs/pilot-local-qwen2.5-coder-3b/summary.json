@@ -1,115 +1,121 @@
 {
- "n_tasks": 5,
+ "n_tasks": 7,
  "strategies": {
   "solo": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
    "calls_per_task": 1.0,
-   "tokens_per_task": 364.2
+   "tokens_per_task": 372.85714285714283
   },
   "first": {
-   "passed": 4,
-   "n": 5,
-   "pass_rate": 0.8,
+   "passed": 6,
+   "n": 7,
+   "pass_rate": 0.8571428571428571,
    "ci95": [
-    0.3755282641185388,
-    0.9637768390302125
+    0.48686549668097007,
+    0.9743210440510253
    ],
    "calls_per_task": 2.0,
-   "tokens_per_task": 1111.2
+   "tokens_per_task": 1082.7142857142858
   },
   "vote": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
    "calls_per_task": 5.0,
-   "tokens_per_task": 2844.8
+   "tokens_per_task": 2796.4285714285716
   },
   "debate": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
    "calls_per_task": 8.0,
-   "tokens_per_task": 7058.0
+   "tokens_per_task": 6736.142857142857
   },
   "tests_only": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
    "calls_per_task": 5.0,
-   "tokens_per_task": 2844.8
+   "tokens_per_task": 2796.4285714285716
   },
   "arbitration_select": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
-   "calls_per_task": 5.6,
-   "tokens_per_task": 3083.2
+   "calls_per_task": 5.714285714285714,
+   "tokens_per_task": 3094.285714285714
   },
   "arbitration": {
-   "passed": 5,
-   "n": 5,
+   "passed": 7,
+   "n": 7,
    "pass_rate": 1.0,
    "ci95": [
-    0.5655085052479191,
+    0.6456611570247934,
     1.0
    ],
-   "calls_per_task": 6.0,
-   "tokens_per_task": 3464.6
+   "calls_per_task": 6.142857142857143,
+   "tokens_per_task": 3539.285714285714
   }
  },
- "oracle_passed": 5,
+ "oracle_passed": 7,
  "paired": {
   "solo": {
    "arbitration_wins": 0,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   },
   "first": {
    "arbitration_wins": 1,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   },
   "vote": {
    "arbitration_wins": 0,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   },
   "debate": {
    "arbitration_wins": 0,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   },
   "tests_only": {
    "arbitration_wins": 0,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   },
   "arbitration_select": {
    "arbitration_wins": 0,
    "baseline_wins": 0,
-   "p_value": 1.0
+   "p_value": 1.0,
+   "p_holm": 1.0
   }
  },
  "models": [
@@ -122,28 +128,40 @@
     "research",
     "testing"
    ],
-   "calls": 55,
+   "calls": 78,
    "errors": 0,
-   "input_tokens": 26189,
-   "output_tokens": 15883,
-   "avg_latency_s": 8.920267208345665,
+   "input_tokens": 37217,
+   "output_tokens": 20360,
+   "avg_latency_s": 7.80157981839777,
    "cost_usd": 0.0
   }
  ],
  "evidence": {
   "tasks_with_disagreement": 1,
-  "tasks_with_disputes": 3,
-  "disputed_cases": 9,
-  "rulings_decided": 9,
+  "tasks_with_disputes": 5,
+  "disputed_cases": 16,
+  "rulings_decided": 16,
   "rulings_unsure": 0,
-  "rulings_agreeing_with_reference": 7,
-  "rulings_checked": 9,
-  "tester_expectations_correct": 21,
-  "tester_expectations_judged": 26,
+  "rulings_unreadable": 0,
+  "rulings_agreeing_with_reference": 11,
+  "rulings_checked": 16,
+  "tester_expectations_correct": 30,
+  "tester_expectations_judged": 42,
   "spec_example_cases": 12,
-  "repairs_attempted": 2,
+  "repairs_attempted": 3,
   "repairs_accepted": 1,
-  "unsafe_candidates": 0
+  "unsafe_candidates": 0,
+  "unsafe_answers": 0,
+  "solo_unsafe": 0,
+  "debate_unsafe": 0,
+  "grade_reasons": {},
+  "distinct_behaviours": {
+   "1": 6,
+   "2": 1
+  },
+  "pool_diversity": 0.38095238095238093,
+  "verified_cases": 16,
+  "cases_total": 16
  },
  "per_task": [
   {
@@ -192,6 +210,28 @@
   },
   {
    "task_id": "HumanEval/35",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/98",
+   "solo": true,
+   "first": true,
+   "vote": true,
+   "debate": true,
+   "tests_only": true,
+   "arbitration_select": true,
+   "arbitration": true,
+   "oracle": true
+  },
+  {
+   "task_id": "HumanEval/107",
    "solo": true,
    "first": true,
    "vote": true,
