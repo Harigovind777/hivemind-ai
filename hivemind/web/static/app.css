@@ -251,8 +251,8 @@ details.round > .feed { padding-left: 14px; border-left: 2px solid var(--rule); 
 .answer-card.failed { border-top-color: var(--fail); }
 .answer-card .verified { font-weight: 500; }
 .answer-card.failed .verified { color: var(--fail); }
-.failures h4 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
-.failures ul { padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.failures h4, .rulings h4 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.failures ul, .rulings ul { padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
 .retry { padding: 8px 0; }
 .chat-composer { position: sticky; bottom: 0; z-index: 2; display: grid; gap: 8px;
   padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--rule); }

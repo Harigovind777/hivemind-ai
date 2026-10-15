@@ -1,10 +1,12 @@
 """Chat calls: spec drafting and checking, reading follow-ups, answering questions."""
 
+import ast
+
 import pytest
 
 from hivemind.agents import Team, Transcript
-from hivemind.chat import (SpecError, answer_question, classify, custom_task, draft_spec,
-                           round_context, spec_text, validate_spec)
+from hivemind.chat import (ModelCallFailed, SpecError, answer_question, classify, custom_task,
+                           display_source, draft_spec, round_context, spec_text, validate_spec)
 from hivemind.llm import Ledger, ScriptedLLM
 
 SPEC = ('from typing import List\n\n\ndef second_largest(nums: List[int]) -> int:\n'
@@ -108,7 +110,8 @@ def test_classify_reads_the_last_verdict_and_defaults_to_question(reply, reading
 
 def test_round_context_summarises_the_evidence():
     text = round_context(SPEC, ANSWER)
-    assert SPEC.rstrip() in text and "from candidate 1" in text
+    # ChatAnswer counts candidates from 0; people (and the round's bubbles) count from 1.
+    assert SPEC.rstrip() in text and "from candidate 2" in text
     assert "passes 3 of 4 verified cases (2 from the specification's examples, 1 ruled on" in text
     assert "second_largest([1]): expected None, got <IndexError>" in text
     assert "second_largest([5, 5]): options 5, <IndexError>; chose <IndexError>" in text
@@ -129,3 +132,42 @@ def test_custom_task_has_no_hidden_tests():
     assert (task.task_id, task.entry_point, task.hidden_test, task.canonical_solution) == (
         "chat/abc/1", "second_largest", "", "")
     assert task.spec == SPEC.strip()
+
+
+def failing_team():
+    def respond(system, prompt):
+        raise TimeoutError("timed out")
+    return team(respond)
+
+
+def test_a_failed_model_call_stops_the_chat_call_instead_of_looking_like_a_reply():
+    tr = Transcript("chat/test")
+    with pytest.raises(ModelCallFailed, match="Research agent's model call failed: timed out"):
+        draft_spec(failing_team(), "anything", tr)
+    assert len(tr.turns) == 1  # no retry of a call that failed
+    with pytest.raises(ModelCallFailed, match="Coordinator's model call failed"):
+        classify(failing_team(), "why?", "context", Transcript("chat/test"))
+    with pytest.raises(ModelCallFailed):
+        answer_question(failing_team(), "why?", "context", [], Transcript("chat/test"))
+
+
+@pytest.mark.parametrize("odd", ["\x0c", "\x85", " ", "\x1c", "é — 😀"])
+def test_a_spec_with_unusual_characters_keeps_its_closing_quotes(odd):
+    text = f'def f(x):\n    """Double x. {odd} ok.\n    >>> f(2)\n    4\n    """\n'
+    spec = validate_spec(text)
+    assert spec.text == text and spec.examples == 1
+    ast.parse(spec.text + "    pass\n")  # what the pipeline builds must still parse
+
+
+def test_windows_line_endings_are_accepted():
+    assert validate_spec(SPEC.replace("\n", "\r\n")).text == SPEC
+
+
+def test_a_lone_surrogate_is_a_spec_error_not_a_crash():
+    with pytest.raises(SpecError, match="not valid text"):
+        validate_spec('def f(x):\n    """Bad \ud800 text."""\n')
+
+
+def test_display_source_counts_candidates_from_one():
+    assert display_source("candidate 0") == "candidate 1"
+    assert display_source("repair of candidate 2") == "repair of candidate 3"

@@ -21,6 +21,9 @@ const chat = {
   ran: new Set(), // spec ids a round has used
 };
 
+// ChatAnswer counts candidates from 0; the round's bubbles (and people) count from 1.
+const displaySource = (source) => source.replace(/candidate (\d+)/, (_, n) => `candidate ${Number(n) + 1}`);
+
 const chatPath = (suffix = '') => `/api/chats/${encodeURIComponent(chat.id)}${suffix}`;
 
 function setChatState(text) { $('#chat-state').textContent = text || CHAT_IDLE_TEXT; }
@@ -265,12 +268,15 @@ function answerCard(round, a) {
   const flagged = a.unsafe.filter(Boolean).length;
   return h('article', { class: `entry answer-card${a.working ? '' : ' failed'}` },
     entryHead(who('coordinator', 'Team answer'), `Round ${round}`,
-      a.repaired ? `${a.source}, kept because it passes more verified cases` : a.source),
+      a.repaired ? `${displaySource(a.source)}, kept because it passes more verified cases` : displaySource(a.source)),
     a.working ? null : h('p', { class: 'note' }, 'No candidate produced working code. This is the best attempt, and the failures below show why. Send a message to change the problem.'),
     h('p', { class: 'verified' }, verifiedLine(a)),
     h('pre', { class: 'code' }, a.code || '(no code)'),
     a.failures.length ? h('div', { class: 'failures' }, h('h4', {}, 'Verified cases it still fails'),
       h('ul', {}, a.failures.map((f) => h('li', {}, h('code', {}, f.call), ` should give ${f.expected}, gives ${f.got}`)))) : null,
+    a.rulings.length ? h('div', { class: 'rulings' }, h('h4', {}, "The Coordinator's rulings"),
+      h('ul', {}, a.rulings.map((r) => h('li', {}, h('code', {}, r.call),
+        r.choice == null ? ': unsure, so the case was not used' : ` should give ${r.choice}`)))) : null,
     flagged ? h('p', { class: 'note' }, `${plural(flagged, 'candidate')} flagged by the security scan.`) : null);
 }
 
@@ -329,9 +335,15 @@ async function reinterpret(messageId) {
 }
 
 async function retryChat(ev) {
-  ev.currentTarget.disabled = true;
+  const button = ev.currentTarget;
+  button.disabled = true;
   showChatProblems([]);
-  try { await api('POST', chatPath('/retry')); } catch (err) { showChatProblems(problemsOf(err)); }
+  try {
+    await api('POST', chatPath('/retry'));
+  } catch (err) {
+    button.disabled = false; // refused (busy, not ready): the person can try again later
+    showChatProblems(problemsOf(err));
+  }
 }
 
 $('#chat-form').addEventListener('submit', sendChat);
